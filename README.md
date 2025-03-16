@@ -166,3 +166,7 @@ response = client.chat.completions.create(
 
 print(response.choices[0].message.content)
 ```
+
+## 特别感谢
+
+本项目基于[grok3_api](https://github.com/orzogc/grok3_api)翻译得来。
