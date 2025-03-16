@@ -419,8 +419,8 @@ class AsyncGrokClient(BaseGrokClient):
         logger.debug(f"请求负载: {json_payload}")
         
         # 记录代理信息（如果有）
-        if hasattr(self.http_client, 'proxy') and self.http_client.proxy:
-            logger.debug(f"使用代理: {self.http_client.proxy}")
+        if self.proxy:
+            logger.debug(f"使用代理: {self.proxy}")
         
         # 发送请求并处理响应
         try:
@@ -437,7 +437,7 @@ class AsyncGrokClient(BaseGrokClient):
             if response.status_code != 200:
                 try:
                     body = response.text
-                    error_msg = f"Grok API错误: {response.status_code} {response.reason_phrase}, 响应内容: {body}"
+                    error_msg = f"Grok API错误: {response.status_code} {response.reason_phrase}, 响应内容: {body[:500]}"
                 except Exception:
                     error_msg = f"Grok API错误: {response.status_code} {response.reason_phrase}"
                 raise GrokApiError(error_msg)
@@ -626,8 +626,8 @@ class SyncGrokClient(BaseGrokClient):
         logger.debug(f"请求负载: {json_payload}")
         
         # 记录代理信息（如果有）
-        if hasattr(self.http_client, 'proxy') and self.http_client.proxy:
-            logger.debug(f"使用同步代理: {self.http_client.proxy}")
+        if self.proxy:
+            logger.debug(f"使用同步代理: {self.proxy}")
         
         # 发送请求并处理响应
         try:
@@ -644,7 +644,7 @@ class SyncGrokClient(BaseGrokClient):
             if response.status_code != 200:
                 try:
                     body = response.text
-                    error_msg = f"Grok API同步错误: {response.status_code} {response.reason_phrase}, 响应内容: {body}"
+                    error_msg = f"Grok API同步错误: {response.status_code} {response.reason_phrase}, 响应内容: {body[:500]}"
                 except Exception:
                     error_msg = f"Grok API同步错误: {response.status_code} {response.reason_phrase}"
                 raise GrokApiError(error_msg)

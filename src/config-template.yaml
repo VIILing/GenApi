@@ -1,5 +1,5 @@
 # 认证令牌 (GROK3_AUTH_TOKEN)
-token: "mio"
+token: "abc123"
 
 # 提示前的文本 (GROK3_BEFORE_PROMPT)
 textBeforePrompt: ""

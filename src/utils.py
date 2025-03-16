@@ -108,10 +108,10 @@ class ThreadSafeCookieManagerClass:
                 return None, None
             
             # 选择使用次数最少的cookie
-            min_use_index = min(available_cookies, key=lambda x: x.success_count)
-            min_use_index.mark_occupied()
+            min_use = min(available_cookies, key=lambda x: (x.success_count + x.fail_count))
+            min_use.mark_occupied()
             
-            return min_use_index, self.cookies[min_use_index].cookie
+            return min_use.index, min_use.cookie
    
     def release_cookie(self, cookie_index: int, error_msg: str = None):
         """

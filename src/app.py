@@ -52,7 +52,7 @@ logger.setLevel(logging.INFO)
 security = HTTPBearer()
 
 # 全局配置
-api_token = "mio"
+api_token = "abc123"
 text_before_prompt = ""
 text_after_prompt = ""
 keep_chat = False
@@ -305,7 +305,7 @@ async def chat_completion(
             # 确保在返回错误前关闭客户端
             await grok_client.close()
             # 释放cookie
-            cookie_manager.release_cookie(cookie_index, False, f"未配置CF绕过代理: {e.message}")
+            cookie_manager.release_cookie(cookie_index, f"未配置CF绕过代理: {e.message}")
             raise HTTPException(
                 status_code=500,
                 detail=f"请求Grok API失败，且未配置CF绕过代理: {e.message}"
@@ -341,7 +341,7 @@ async def chat_completion(
             logger.error(f"使用CF绕过代理和同步客户端请求失败: {str(cf_error)}")
             
             # 释放cookie
-            cookie_manager.release_cookie(cookie_index, False, f"使用CF绕过代理和同步客户端请求失败: {str(cf_error)}")
+            cookie_manager.release_cookie(cookie_index, f"使用CF绕过代理和同步客户端请求失败: {str(cf_error)}")
             
             raise HTTPException(
                 status_code=500,
@@ -361,7 +361,7 @@ async def chat_completion(
                 error_msg = f"CloudFlare 403错误: {str(e)}"
                 logger.warning(f"Cookie {cookie_index} 收到403错误，可能被CloudFlare拦截")
             
-            cookie_manager.release_cookie(cookie_index, False, error_msg)
+            cookie_manager.release_cookie(cookie_index, error_msg)
         
         await grok_client.close()  # 发生错误时关闭客户端
         
@@ -388,7 +388,7 @@ async def chat_completion(
         
         # 确保客户端已关闭并释放cookie
         await grok_client.close()
-        cookie_manager.release_cookie(cookie_index, False, f"处理请求时发生未知异常: {str(e)}")
+        cookie_manager.release_cookie(cookie_index, f"处理请求时发生未知异常: {str(e)}")
         
         raise HTTPException(
             status_code=500,
@@ -431,7 +431,7 @@ async def _chat_completion_request(
                 full_response = await grok_client.full_response(message_text)
                 
                 # 释放cookie
-                cookie_manager.release_cookie(cookie_index, True)
+                cookie_manager.release_cookie(cookie_index)
                 
                 # 返回OpenAI格式的响应
                 return JSONResponse(content=grok_client.create_openai_full_response_body(full_response))
@@ -452,7 +452,7 @@ async def _chat_completion_request(
                 error_msg = f"CloudFlare 403错误: {str(e)}"
                 logger.warning(f"Cookie {cookie_index} 收到403错误，可能被CloudFlare拦截")
             
-            cookie_manager.release_cookie(cookie_index, False, error_msg)
+            cookie_manager.release_cookie(cookie_index, error_msg)
         
         await grok_client.close()  # 发生错误时关闭客户端
         
@@ -480,7 +480,7 @@ async def _chat_completion_request(
         
         # 释放cookie
         if cookie_index is not None:
-            cookie_manager.release_cookie(cookie_index, False, error_msg)
+            cookie_manager.release_cookie(cookie_index, error_msg)
             
         await grok_client.close()  # 发生错误时关闭客户端
         
@@ -513,7 +513,7 @@ async def _stream_with_cookie_cleanup(client: BaseGrokClient, message: str, cook
     finally:
         # 释放cookie并关闭客户端
         logger.debug("流式响应完成，释放cookie和关闭客户端")
-        cookie_manager.release_cookie(cookie_index, success, error_msg)
+        cookie_manager.release_cookie(cookie_index, error_msg)
         await client.close()  # 流式传输完成后关闭客户端
         
 
