@@ -707,3 +707,68 @@ async def is_enable_cookie(
     except Exception as e:
         logger.error(f"更新Cookie时出错: {str(e)}")
         raise HTTPException(status_code=500, detail=f"更新Cookie失败: {str(e)}")
+
+
+class AddCookieRequest(BaseModel):
+    file_name: str
+    cookie: str
+
+
+@app.post("/api/setting/add-cookie")
+async def add_cookie(
+    request: AddCookieRequest,
+    _: str = Depends(verify_admin)
+):
+    if not cookie_manager:
+        raise HTTPException(status_code=404, detail="Cookie管理器未初始化") 
+    
+    try:
+        success, msg = cookie_manager.add_cookie(request.file_name, request.cookie)
+        if not success:
+            return {
+                "status": 1,
+                "msg": msg,
+                "data": None
+            }
+        return {
+            "status": 0,
+            "msg": "Cookie添加成功",
+            "data": {
+                "cookie_index": cookie_manager.next_idx - 1,
+                "file_name": request.file_name
+            }
+        }
+    except Exception as e:
+        logger.error(f"添加Cookie时出错: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"添加Cookie失败: {str(e)}")
+
+
+class DeleteCookieRequest(BaseModel):
+    cookie_index: int
+
+
+@app.post("/api/setting/delete-cookie")
+async def delete_cookie(
+    request: DeleteCookieRequest,
+    _: str = Depends(verify_admin)
+):
+    if not cookie_manager:
+        raise HTTPException(status_code=404, detail="Cookie管理器未初始化") 
+    
+    try:
+        success, msg = cookie_manager.delete_cookie(request.cookie_index)
+        if not success:
+            return {
+                "status": 1,
+                "msg": msg,
+                "data": None
+            }
+        return {
+            "status": 0,
+            "msg": "Cookie删除成功",
+            "data": None
+        }
+    except Exception as e:
+        logger.error(f"删除Cookie时出错: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"删除Cookie失败: {str(e)}")
+    

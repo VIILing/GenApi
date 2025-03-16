@@ -28,6 +28,7 @@ class BaseCookie(ABC):
         self.last_fail_time = None
         self.last_error = None
         self.is_occupied = False
+        self.has_been_deleted = False
         
     @abstractmethod
     def get_classification(self) -> str:
@@ -91,6 +92,8 @@ class ThreadSafeCookieManagerClass:
         for i, cookie in enumerate(cookies):
             filename = filenames[i] if filenames and i < len(filenames) else ""
             self.cookies[i] = GrokCookie(i, cookie, filename)
+            
+        self.next_idx = max(self.cookies.keys()) + 1
 
     def get_cookie(self, classification: Optional[str] = None) -> tuple[Optional[int], Optional[str]]:
         """
@@ -100,7 +103,7 @@ class ThreadSafeCookieManagerClass:
             (cookie索引, cookie字符串)的元组，如果没有可用cookie则返回(None, None)
         """
         with self.lock:
-            available_cookies = [v for v in self.cookies.values() if v.is_enable and not v.is_occupied]
+            available_cookies = [v for v in self.cookies.values() if v.is_enable and not v.is_occupied and not v.has_been_deleted]
             if classification:
                 available_cookies = [v for v in available_cookies if v.classification == classification]
             if not available_cookies:
@@ -129,28 +132,6 @@ class ThreadSafeCookieManagerClass:
                 # 如果是403错误，记录特殊日志
                 if error_msg and "403" in error_msg:
                     logger.warning(f"Cookie {cookie_index} 收到403错误: {error_msg}")
-                    
-    def enable_cookie(self, cookie_index: int):
-        """
-        启用指定cookie索引
-        
-        Args:
-            cookie_index: cookie索引
-        """
-        with self.lock:
-            if cookie_index is not None and cookie_index in self.cookies:
-                self.cookies[cookie_index].is_enable = True
-                
-    def disable_cookie(self, cookie_index: int):
-        """
-        禁用指定cookie索引
-        
-        Args:
-            cookie_index: cookie索引
-        """
-        with self.lock:
-            if cookie_index is not None and cookie_index in self.cookies:
-                self.cookies[cookie_index].is_enable = False
     
     def get_cookie_stats(self) -> List[Dict[str, Any]]:
         """
@@ -160,7 +141,7 @@ class ThreadSafeCookieManagerClass:
             包含所有cookie统计信息的列表
         """
         with self.lock:
-            return [cookie.get_stats() for cookie in self.cookies.values()]
+            return [cookie.get_stats() for cookie in self.cookies.values() if not cookie.has_been_deleted]
         
     @classmethod
     def load_cookies_from_files(cls) -> Self:
@@ -221,7 +202,6 @@ class ThreadSafeCookieManagerClass:
             
             return True, "Cookie更新成功"
         
-        
     def is_enable_cookie(self, cookie_index: int, new_status: bool) -> bool:
         """
         启用或禁用指定cookie索引
@@ -240,6 +220,53 @@ class ThreadSafeCookieManagerClass:
             else:
                 self.cookies[cookie_index].is_enable = new_status
                 return True, "Cookie更新成功"
+            
+    def add_cookie(self, file_name: str, cookie: str) -> tuple[bool, str]:
+        """
+        添加新的cookie
+        
+        Args:
+            cookie: 新的cookie字符串    
+            file_name: 新的cookie文件名
+        """
+        
+        if file_name in {v.file_name for v in self.cookies.values()}:
+            return False, "文件名已存在"
+        
+        with self.lock:
+            try:
+                with open(f"cookies/{file_name}", "w", encoding="utf-8") as f:
+                    f.write(cookie)
+            except Exception as e:
+                logger.error(f"添加cookie文件时出错: {str(e)}")
+                return False, f"添加cookie文件时出错: {str(e)}"
+            
+            self.cookies[self.next_idx] = GrokCookie(self.next_idx, cookie, file_name)
+            self.next_idx += 1
+            
+            return True, "Cookie添加成功"
+            
+    def delete_cookie(self, cookie_index: int) -> tuple[bool, str]:
+        """
+        删除指定cookie索引
+        
+        Args:
+            cookie_index: cookie索引
+        """
+        with self.lock:
+            if cookie_index is None or cookie_index not in self.cookies:
+                return False, "cookie索引不存在"
+            else:
+                self.cookies[cookie_index].has_been_deleted = True
+                
+                try:
+                    if os.path.exists(f"cookies/{self.cookies[cookie_index].file_name}"):
+                        os.remove(f"cookies/{self.cookies[cookie_index].file_name}")
+                except Exception as e:
+                    logger.error(f"删除cookie文件时出错: {str(e)}")
+                    return True, f"删除cookie文件时出错: {str(e)}"
+                
+                return True, "Cookie删除成功"
 
 
 def must_marshal(obj: Any) -> str:

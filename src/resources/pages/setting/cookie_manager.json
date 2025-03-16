@@ -74,20 +74,123 @@
                 "behavior": [
                   "FuzzyQuery"
                 ],
-                "body": [],
+                "body": [
+                  {
+                    "type": "button",
+                    "label": "添加Cookie",
+                    "onEvent": {
+                      "click": {
+                        "actions": [
+                          {
+                            "ignoreError": false,
+                            "actionType": "dialog",
+                            "dialog": {
+                              "type": "dialog",
+                              "title": "新增Cookie",
+                              "body": [
+                                {
+                                  "id": "u:661abed95e38",
+                                  "type": "form",
+                                  "title": "表单",
+                                  "mode": "flex",
+                                  "labelAlign": "top",
+                                  "dsType": "api",
+                                  "feat": "Insert",
+                                  "body": [
+                                    {
+                                      "name": "file_name",
+                                      "label": "文件名（邮箱名）",
+                                      "row": 0,
+                                      "type": "input-text",
+                                      "id": "u:8bfe60bac049",
+                                      "required": true,
+                                      "validations": {
+                                        "isEmail": true
+                                      }
+                                    },
+                                    {
+                                      "name": "cookie",
+                                      "label": "cookie",
+                                      "row": 1,
+                                      "type": "input-text",
+                                      "id": "u:a63c96aa2f4d",
+                                      "required": true
+                                    }
+                                  ],
+                                  "api": {
+                                    "url": "/api/setting/add-cookie",
+                                    "method": "post",
+                                    "requestAdaptor": "",
+                                    "adaptor": "",
+                                    "messages": {},
+                                    "dataType": "json"
+                                  },
+                                  "actions": [
+                                    {
+                                      "type": "button",
+                                      "label": "提交",
+                                      "onEvent": {
+                                        "click": {
+                                          "actions": [
+                                            {
+                                              "actionType": "submit",
+                                              "componentId": "u:661abed95e38"
+                                            }
+                                          ]
+                                        }
+                                      },
+                                      "level": "primary"
+                                    }
+                                  ],
+                                  "resetAfterSubmit": true
+                                }
+                              ],
+                              "id": "u:28c78f25bbda",
+                              "actions": [
+                                {
+                                  "type": "button",
+                                  "actionType": "cancel",
+                                  "label": "取消",
+                                  "id": "u:e0a4db13648c"
+                                },
+                                {
+                                  "type": "button",
+                                  "actionType": "confirm",
+                                  "label": "确定",
+                                  "primary": true,
+                                  "id": "u:c980572039a5"
+                                }
+                              ],
+                              "showCloseButton": true,
+                              "closeOnOutside": false,
+                              "closeOnEsc": false,
+                              "showErrorMsg": true,
+                              "showLoading": true,
+                              "draggable": false,
+                              "editorSetting": {
+                                "displayName": "新增Cookie"
+                              }
+                            }
+                          }
+                        ]
+                      }
+                    },
+                    "id": "u:572c3a24b0b2"
+                  }
+                ],
                 "wrapperBody": false,
                 "style": {
                   "flexGrow": 1,
                   "flex": "1 1 auto",
                   "position": "static",
                   "display": "flex",
-                  "flexBasis": "auto",
                   "flexDirection": "row",
                   "flexWrap": "nowrap",
                   "alignItems": "stretch",
                   "justifyContent": "flex-end"
                 },
-                "id": "u:446ff19e7393"
+                "id": "u:446ff19e7393",
+                "isFixedHeight": false
               }
             ],
             "id": "u:963796f72ebc"
@@ -106,20 +209,35 @@
               {
                 "type": "container",
                 "align": "left",
-                "body": [],
+                "body": [
+                  {
+                    "type": "flex",
+                    "items": [],
+                    "style": {
+                      "position": "relative",
+                      "rowGap": "10px",
+                      "columnGap": "10px",
+                      "flexWrap": "nowrap",
+                      "flex": "0 0 auto",
+                      "inset": "auto"
+                    },
+                    "id": "u:6b4efe649a05",
+                    "isFixedHeight": false
+                  }
+                ],
                 "wrapperBody": false,
                 "style": {
                   "flexGrow": 1,
                   "flex": "1 1 auto",
                   "position": "static",
                   "display": "flex",
-                  "flexBasis": "auto",
                   "flexDirection": "row",
                   "flexWrap": "nowrap",
                   "alignItems": "stretch",
                   "justifyContent": "flex-start"
                 },
-                "id": "u:28e27fcb2534"
+                "id": "u:28e27fcb2534",
+                "isFixedHeight": false
               },
               {
                 "type": "container",
@@ -638,6 +756,114 @@
                     ]
                   }
                 }
+              },
+              {
+                "label": "删除Cookie",
+                "level": "link",
+                "id": "u:be155fc719f8",
+                "onEvent": {
+                  "click": {
+                    "weight": 0,
+                    "actions": [
+                      {
+                        "ignoreError": false,
+                        "actionType": "dialog",
+                        "dialog": {
+                          "type": "dialog",
+                          "title": "删除Cookie",
+                          "body": [
+                            {
+                              "id": "u:563d5097a642",
+                              "type": "form",
+                              "title": "表单",
+                              "mode": "flex",
+                              "labelAlign": "top",
+                              "dsType": "api",
+                              "feat": "Insert",
+                              "body": [
+                                {
+                                  "name": "cookie_index",
+                                  "label": "cookie_index",
+                                  "row": 0,
+                                  "type": "input-text",
+                                  "id": "u:ac7caeb0e5af",
+                                  "value": "${update_index}",
+                                  "readOnly": true
+                                }
+                              ],
+                              "api": {
+                                "url": "/api/setting/delete-cookie",
+                                "method": "post",
+                                "requestAdaptor": "",
+                                "adaptor": "",
+                                "messages": {},
+                                "dataType": "json"
+                              },
+                              "actions": [
+                                {
+                                  "type": "button",
+                                  "label": "提交",
+                                  "onEvent": {
+                                    "click": {
+                                      "actions": [
+                                        {
+                                          "actionType": "submit",
+                                          "componentId": "u:563d5097a642"
+                                        }
+                                      ]
+                                    }
+                                  },
+                                  "level": "primary"
+                                }
+                              ],
+                              "resetAfterSubmit": true
+                            }
+                          ],
+                          "id": "u:120201d2ed32",
+                          "actions": [
+                            {
+                              "type": "button",
+                              "actionType": "cancel",
+                              "label": "取消",
+                              "id": "u:d4bb2ca4c99c"
+                            },
+                            {
+                              "type": "button",
+                              "actionType": "confirm",
+                              "label": "确定",
+                              "primary": true,
+                              "id": "u:c3b2779df1e3"
+                            }
+                          ],
+                          "showCloseButton": true,
+                          "closeOnOutside": false,
+                          "closeOnEsc": false,
+                          "showErrorMsg": true,
+                          "showLoading": true,
+                          "draggable": false,
+                          "editorSetting": {
+                            "displayName": "删除Cookie"
+                          },
+                          "actionType": "dialog",
+                          "inputParams": {
+                            "type": "object",
+                            "properties": {
+                              "update_index": {
+                                "type": "number"
+                              }
+                            },
+                            "required": [
+                              "update_index"
+                            ]
+                          }
+                        },
+                        "data": {
+                          "update_index": "${index}"
+                        }
+                      }
+                    ]
+                  }
+                }
               }
             ]
           }
@@ -664,7 +890,7 @@
     "toolbar": [
       {
         "type": "button",
-        "label": "登出（点击登出后需要手动刷新页面，不然会无限登出）",
+        "label": "登出（点击登出后不要管新弹出来的登录框，要手动刷新页面，不然会要求无限登录）",
         "onEvent": {
           "click": {
             "actions": [
