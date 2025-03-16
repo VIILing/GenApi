@@ -1,0 +1,6 @@
+venv/
+test/
+src/__pycache__/
+src/cookies/
+src/logs/
+src/config.yaml
