@@ -3,8 +3,8 @@
     "title": "CookieManager",
     "body": [
       {
-        "id": "u:aa0a7c9f5090",
         "type": "crud2",
+        "id": "u:aa0a7c9f5090",
         "mode": "table2",
         "dsType": "api",
         "syncLocation": true,
@@ -253,7 +253,7 @@
           {
             "type": "tpl",
             "title": "上一次请求失败时间",
-            "name": "last_success_time",
+            "name": "last_fail_time",
             "id": "u:7d5438d49b8d",
             "placeholder": "-",
             "sorter": true
