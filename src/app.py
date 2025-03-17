@@ -45,7 +45,6 @@ logging.basicConfig(
 )
 logging.getLogger('httpcore').setLevel(logging.ERROR)
 logger = logging.getLogger("GenApi.app")
-logger.setLevel(logging.INFO)
 
 
 # 安全认证
@@ -504,6 +503,7 @@ async def _stream_with_cookie_cleanup(client: BaseGrokClient, message: str, cook
     try:
         # 使用客户端的OpenAI流式响应方法
         async for chunk in client.stream_openai_response(message):
+            logger.debug(f'Yield OpenAi chunk: {chunk}')
             yield chunk
     except Exception as e:
         logger.error(f"流式响应生成错误: {e}")

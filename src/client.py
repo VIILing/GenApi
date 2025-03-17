@@ -31,7 +31,8 @@ from constants import (
 )
 from utils import generate_uuid, must_marshal
 
-logger = logging.getLogger('GenApi.client')
+
+logger = logging.getLogger('GenApi.GrokClient')
 
 
 class GrokApiError(Exception):
@@ -171,7 +172,7 @@ class BaseGrokClient(ABC):
                 )
             ]
         )
-        return f"data: {must_marshal(chunk.model_dump())}\n\n"
+        return must_marshal(chunk.model_dump())  # sse_starlette 模块会自动附加 data: 和 \n\n 部分
     
     @abstractmethod
     async def close(self):
@@ -238,14 +239,20 @@ class BaseGrokClient(ABC):
         Raises:
             GrokApiError: 如果请求失败
         """
+        
+        logger.info('准备发送消息')
+        
         # 处理超长消息上传为文件
         file_id = ""
         if self.upload_message or len(message) > MESSAGE_CHARS_LIMIT:
+            logger.info('消息过长，以文件的形式上传。')
             upload_resp = await self._upload_message_as_file(message)
             file_id = upload_resp.fileMetadataId
             message = DEFAULT_UPLOAD_MESSAGE_PROMPT
+            logger.info('上传消息文件成功。')
         
         # 准备请求负载并发送请求
+        logger.info('发送流式响应请求')
         payload = self.prepare_payload(message, file_id)
         response = await self._do_request(
             method="POST",
@@ -253,9 +260,14 @@ class BaseGrokClient(ABC):
             payload=payload
         )
         
+        logger.info('请求发送成功，等待解析。')
+        
         # 解析并生成响应令牌
         async for token in self._parse_streaming_response(response):
+            logger.debug(f'流式响应返回token: {token}')
             yield token
+            
+        logger.info('所有token都获取关闭')
     
     async def stream_openai_response(self, message: str) -> AsyncGenerator[str, None]:
         """
@@ -280,7 +292,7 @@ class BaseGrokClient(ABC):
             yield chunk_data
         
         # 发送完成事件
-        yield "data: [DONE]\n\n"
+        yield "[DONE]"
     
     async def full_response(self, message: str) -> str:
         """
