@@ -1,11 +1,8 @@
 # 内置库
-import os
-import shutil
 import logging
 from contextlib import asynccontextmanager
 
 # 三方库
-import yaml
 from fastapi import FastAPI, Request
 from fastapi.responses import Response
 from fastapi.staticfiles import StaticFiles
@@ -15,6 +12,7 @@ from init import *
 
 # 配置日志
 os.makedirs('logs', exist_ok=True)
+# noinspection PyUnresolvedReferences
 logging.basicConfig(
     level=logging.INFO,
     format='[%(asctime)s][%(name)s][%(thread)s][%(threadName)s][%(levelname)s] %(message)s (%(filename)s:%(lineno)d)',
