@@ -69,7 +69,7 @@ class BaseCookie(ABC):
             "index": self.index,
             "classification": self.classification,
             "file_name": self.file_name,
-            "is_enable": self.is_enable,
+            "is_enable": '启用中' if self.is_enable else '手动禁止中',
             "cookie": self.cookie,
             "success_count": self.success_count,
             "fail_count": self.fail_count,
@@ -106,6 +106,38 @@ class ThreadSafeCookieManagerClass:
             
         self.next_idx = max(self.cookies.keys()) + 1 if len(self.cookies) >= 1 else 0
 
+    @staticmethod
+    def filter_alive(cookie_list: list[BaseCookie], classification: Optional[str]) -> list[BaseCookie]:
+
+        alive = []
+
+        for cookie in cookie_list:
+            # 基础筛选条件
+            if not cookie.is_enable or cookie.is_occupied or cookie.has_been_deleted:
+                continue
+
+            # 分类筛选
+            if classification and cookie.classification != classification:
+                continue
+
+            # 连续失败策略处理
+            if len(cookie.continues_error_time) >= 3:
+                # 如果最后更新时间晚于最后失败时间，清空失败记录并允许使用
+                if cookie.last_update_times > cookie.continues_error_time[-1]:
+                    logger.info(f"Cookie {cookie.index} 连续失败但已更新，清空失败记录")
+                    cookie.continues_error_time = []
+                # 如果最后失败时间超过24小时，允许尝试一次
+                elif datetime.now() - cookie.continues_error_time[-1] > timedelta(hours=24):
+                    logger.info(f"Cookie {cookie.index} 连续失败但超过24小时，允许尝试")
+                # 否则不允许使用
+                else:
+                    logger.info(f"Cookie {cookie.index} 连续失败且未更新，跳过使用")
+                    continue
+
+            alive.append(cookie)
+
+        return alive
+
     def get_cookie(self, classification: Optional[str] = None) -> Optional[CookieMsg]:
         """
         获取下一个可用的cookie
@@ -115,31 +147,7 @@ class ThreadSafeCookieManagerClass:
         """
         with self.lock:
             # 筛选可用的cookie
-            available_cookies = []
-            for cookie in self.cookies.values():
-                # 基础筛选条件
-                if not cookie.is_enable or cookie.is_occupied or cookie.has_been_deleted:
-                    continue
-                
-                # 分类筛选
-                if classification and cookie.classification != classification:
-                    continue
-                
-                # 连续失败策略处理
-                if len(cookie.continues_error_time) >= 3:
-                    # 如果最后更新时间晚于最后失败时间，清空失败记录并允许使用
-                    if cookie.last_update_times > cookie.continues_error_time[-1]:
-                        logger.info(f"Cookie {cookie.index} 连续失败但已更新，清空失败记录")
-                        cookie.continues_error_time = []
-                    # 如果最后失败时间超过24小时，允许尝试一次
-                    elif datetime.now() - cookie.continues_error_time[-1] > timedelta(hours=24):
-                        logger.info(f"Cookie {cookie.index} 连续失败但超过24小时，允许尝试")
-                    # 否则不允许使用
-                    else:
-                        logger.info(f"Cookie {cookie.index} 连续失败且未更新，跳过使用")
-                        continue
-                
-                available_cookies.append(cookie)
+            available_cookies = self.filter_alive(list(self.cookies.values()), classification)
             
             if not available_cookies:
                 logger.warning("没有可用的Cookie，所有Cookie都在使用中或不符合使用条件")
@@ -154,10 +162,6 @@ class ThreadSafeCookieManagerClass:
     def release_cookie(self, cookie_msg: CookieMsg, error_msg: str = None):
         """
         释放指定cookie索引并更新其统计信息
-        
-        Args:
-            cookie_index: cookie索引
-            error_msg: 如果失败，错误信息
         """
         with self.lock:
             if cookie_msg.index in self.cookies:
@@ -172,18 +176,21 @@ class ThreadSafeCookieManagerClass:
             包含所有cookie统计信息的列表
         """
         with self.lock:
-            return [cookie.get_stats() for cookie in self.cookies.values() if not cookie.has_been_deleted]
+            ret = []
+            alive = self.filter_alive(list(self.cookies.values()), None)
+            alive_index = {c.index for c in alive}
+            for cookie in self.cookies.values():
+                if cookie.has_been_deleted:
+                    continue
+                s = cookie.get_stats()
+                s['is_alive'] = '存活中' if cookie.index in alive_index else '已死亡'
+                ret.append(s)
+            return ret
         
     @classmethod
     def load_cookies_from_files(cls) -> Self:
         """
         从指定目录加载所有的.txt文件内容作为cookies
-        
-        Args:
-            dir_path: 包含cookie文件的目录路径
-            
-        Returns:
-            ThreadSafeCookieManagerClass实例
         """
         cookies = []
         filenames = []
@@ -235,7 +242,7 @@ class ThreadSafeCookieManagerClass:
             
             return True, "Cookie更新成功"
         
-    def is_enable_cookie(self, cookie_index: int, new_status: bool) -> bool:
+    def is_enable_cookie(self, cookie_index: int, new_status: bool) -> tuple[bool, str]:
         """
         启用或禁用指定cookie索引
         

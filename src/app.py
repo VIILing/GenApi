@@ -72,4 +72,6 @@ async def check_for_403_responses(request: Request, call_next):
 
 
 from routers.chat import Router as ChatRouter
+from routers.manager import RootRouter as ManagerRouter
 app.include_router(ChatRouter)
+app.include_router(ManagerRouter)

@@ -16,7 +16,7 @@ from init import ViewerUser, AdminUser, CookieManager
 _Security = HTTPBasic()
 
 
-Router = APIRouter(prefix='/web')
+RootRouter = APIRouter()
 logger = logging.getLogger("GenApi.chat")
 
 
@@ -64,7 +64,7 @@ def verify_admin(
     return credentials.username
 
 
-@Router.get("/logout")
+@RootRouter.get("/logout")
 async def logout():
     # 返回一个 401 状态码，并设置 WWW-Authenticate 头来提示客户端重新认证
     raise HTTPException(
@@ -103,7 +103,7 @@ def render_html(json_content: str) -> HTMLResponse:
     return HTMLResponse(content=AmisTemplate.format(json_body=json_content), status_code=200)
 
 
-@Router.get("/web/setting/cookie_manager")
+@RootRouter.get("/web/setting/cookie_manager")
 async def web_setting_cookie_manager(_: str = Depends(verify_viewer)):
     json_content = PageJsonCache.get("cookie_manager.json")
     if json_content is None:
@@ -111,7 +111,7 @@ async def web_setting_cookie_manager(_: str = Depends(verify_viewer)):
     return render_html(json_content)
 
 
-@Router.get("/api/setting/cookie-stats")
+@RootRouter.get("/api/setting/cookie-stats")
 async def get_cookie_stats(
     cookie_index: Optional[int] = None,
     _: str = Depends(verify_viewer)
@@ -142,7 +142,7 @@ class UpdateCookieRequest(BaseModel):
     cookie: str
     
 
-@Router.post("/api/setting/update-cookie")
+@RootRouter.post("/api/setting/update-cookie")
 async def update_cookie(
     request: UpdateCookieRequest,
     _: str = Depends(verify_admin)
@@ -176,7 +176,7 @@ class IsEnableCookieRequest(BaseModel):
     is_enable: bool
     
 
-@Router.post("/api/setting/is-enable-cookie")
+@RootRouter.post("/api/setting/is-enable-cookie")
 async def is_enable_cookie(
     request: IsEnableCookieRequest,
     _: str = Depends(verify_admin)
@@ -207,7 +207,7 @@ class AddCookieRequest(BaseModel):
     cookie: str
 
 
-@Router.post("/api/setting/add-cookie")
+@RootRouter.post("/api/setting/add-cookie")
 async def add_cookie(
     request: AddCookieRequest,
     _: str = Depends(verify_admin)
@@ -240,7 +240,7 @@ class DeleteCookieRequest(BaseModel):
     cookie_index: int
 
 
-@Router.post("/api/setting/delete-cookie")
+@RootRouter.post("/api/setting/delete-cookie")
 async def delete_cookie(
     request: DeleteCookieRequest,
     _: str = Depends(verify_admin)
