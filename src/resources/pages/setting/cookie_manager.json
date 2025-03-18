@@ -209,7 +209,8 @@
                             "draggable": false,
                             "editorSetting": {
                               "displayName": "新增Cookie"
-                            }
+                            },
+                            "actionType": "dialog"
                           }
                         }
                       ]
@@ -747,7 +748,7 @@
                                 "row": 1,
                                 "type": "input-text",
                                 "id": "u:a3bde04de491",
-                                "value": "${old_status}",
+                                "value": "${IF(old_status===\"启用中\",\"true\",\"false\")}",
                                 "required": true,
                                 "validations": {
                                   "matchRegexp": "^(true|false)$"
