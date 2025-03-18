@@ -102,7 +102,10 @@ class ThreadSafeCookieManagerClass:
         # 初始化GrokCookie对象
         for i, cookie in enumerate(cookies):
             filename = filenames[i] if filenames and i < len(filenames) else ""
-            self.cookies[i] = GrokCookie(i, cookie, filename)
+            cookie = GrokCookie(i, cookie, filename)
+            if filename.endswith('.ban'):
+                cookie.is_enable = False
+            self.cookies[i] = cookie
             
         self.next_idx = max(self.cookies.keys()) + 1 if len(self.cookies) >= 1 else 0
 
@@ -258,7 +261,19 @@ class ThreadSafeCookieManagerClass:
             if cookie_index is None or cookie_index not in self.cookies:
                 return False, "cookie索引不存在"
             else:
-                self.cookies[cookie_index].is_enable = new_status
+                cookie = self.cookies[cookie_index]
+                cookie.is_enable = new_status
+                try:
+                    old_name = cookie.file_name
+                    new_suffix = '' if cookie.is_enable else '.ban'
+                    new_name = old_name.rstrip('.ban') + new_suffix
+                    need_rename = (old_name != new_name)
+                    cookie.file_name = new_name
+
+                    if need_rename and os.path.exists(f'cookies/{old_name}'):
+                        os.rename(f'cookies/{old_name}', f'cookies/{new_name}')
+                except Exception as e:
+                    logger.warning(f'Cookie的启用状态变更，尝试重新改名时，出现未知异常: {e}')
                 return True, "Cookie更新成功"
             
     def add_cookie(self, file_name: str, cookie: str) -> tuple[bool, str]:
