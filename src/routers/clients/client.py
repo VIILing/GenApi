@@ -135,7 +135,7 @@ class AsyncNetClient(AbsNetClient, ABC):
                 headers=headers
             )
             
-            self.logger.debug(f"[发送请求] [异步] [响应状态码]: : {response.status_code}")
+            self.logger.info(f"[发送请求] [异步] [响应状态码]: : {response.status_code}")
             
             # 检查响应状态码
             if response.status_code != 200:
@@ -221,7 +221,7 @@ class SyncNetClient(AbsNetClient, ABC):
             self.http_client = None
             self.logger.debug("同步HTTP客户端已关闭")
     
-    async def do_request(self, fetch: bool, method: str, url: str, headers: dict[str, str], payload: Union[dict, list]) -> RequestResponse:
+    def do_request(self, fetch: bool, method: str, url: str, headers: dict[str, str], payload: Union[dict, list]) -> RequestResponse:
         """
         """
         

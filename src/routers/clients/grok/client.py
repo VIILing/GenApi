@@ -114,7 +114,7 @@ class Grok3Client(AbsModelClient):
         logger.info("正在将消息作为文件上传")
         
         # 发送上传文件请求
-        with AsyncNetClient(self.logger, self.client_kwargs) as client:
+        async with AsyncNetClient(self.logger, self.client_kwargs) as client:
             response = await client.do_request(
                 fetch=True,
                 stream=False,
@@ -149,8 +149,8 @@ class Grok3Client(AbsModelClient):
             logger.info('异步上传消息文件成功。')
         
         # 准备请求负载并发送请求
-        logger.info('发送流式响应请求')
-        with AsyncNetClient(self.logger, self.client_kwargs) as client:
+        logger.info('开始发送流式响应请求')
+        async with AsyncNetClient(self.logger, self.client_kwargs) as client:
             async for token in client.do_request(
                 fetch=True,
                 stream=True,
@@ -161,20 +161,55 @@ class Grok3Client(AbsModelClient):
             ):
                 yield token
     
+    # async def async_full_response(self, req_params: RequestParams) -> RequestResponse:
+    #     """
+    #     """
+    #     msg = b''
+    #     error_msg = None
+    #     async for chunk in self.async_stream_response(req_params):
+    #         if error_msg is not None:
+    #             break
+    #         if chunk.error_msg is not None:
+    #             error_msg = chunk.error_msg
+    #             break
+    #         msg += chunk.data
+    #
+    #     if error_msg is None:
+    #         return RequestResponse(None, msg, None)
+    #     else:
+    #         return RequestResponse(error_msg, None, None)
+
     async def async_full_response(self, req_params: RequestParams) -> RequestResponse:
         """
         """
-        msg = b''
-        found_error = False
-        async for chunk in self.async_stream_response(req_params):
-            if found_error:
-                break
-            if chunk.error_msg is not None:
-                found_error = True
-                yield RequestResponse(chunk.error_msg, None, None)
-            msg += chunk.data
-        if not found_error:
-            yield RequestResponse(None, msg, None)
+
+        # 处理超长消息上传为文件
+        if DEFAULT_UPLOAD_MESSAGE and len(req_params.message) > MESSAGE_CHARS_LIMIT:
+            logger.info('消息过长，以文件的形式上传。')
+            file_meta_data_id = await self.async_upload_message_as_file(req_params.message, req_params)
+
+            if file_meta_data_id is None:
+                raise RuntimeError('Grok3 异步上传消息文件失败')
+
+            req_params.payload['fileAttachments'] = [file_meta_data_id]
+            req_params.payload['message'] = DEFAULT_UPLOAD_MESSAGE_PROMPT
+            req_params.message = DEFAULT_UPLOAD_MESSAGE_PROMPT
+            logger.info('异步上传消息文件成功。')
+
+        # 准备请求负载并发送请求
+        logger.info('开始发送异步完整响应请求')
+        async with AsyncNetClient(self.logger, self.client_kwargs) as client:
+            resp = RequestResponse('这是异步完整响应的初始化值，看到这个说明异步响应没有成功', None, None)
+            async for r in client.do_request(
+                    fetch=True,
+                    stream=False,
+                    method="POST",
+                    url=UPLOAD_FILE_URL,
+                    headers=req_params.headers,
+                    payload=req_params.payload
+            ):
+                resp = r
+            return resp
 
     def sync_upload_message_as_file(self, message: str, req_params: RequestParams) -> Optional[str]:
         """
@@ -196,7 +231,6 @@ class Grok3Client(AbsModelClient):
         with SyncNetClient(self.logger, self.client_kwargs) as client:
             response = client.do_request(
                 fetch=True,
-                stream=False,
                 method="POST",
                 url=UPLOAD_FILE_URL,
                 headers=req_params.headers,
@@ -230,12 +264,10 @@ class Grok3Client(AbsModelClient):
         # 准备请求负载并发送请求
         logger.info('发送流式响应请求')
         with SyncNetClient(self.logger, self.client_kwargs) as client:
-            async for token in client.do_request(
-                    fetch=True,
-                    stream=True,
-                    method="POST",
-                    url=UPLOAD_FILE_URL,
-                    headers=req_params.headers,
-                    payload=req_params.payload
-            ):
-                yield token
+            return client.do_request(
+                fetch=True,
+                method="POST",
+                url=UPLOAD_FILE_URL,
+                headers=req_params.headers,
+                payload=req_params.payload
+            )
