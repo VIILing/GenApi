@@ -134,7 +134,10 @@ async def chat_completion(
         )
     
     # 确定配置标志
-    request_params = model_client.generate_request_params()
+    request_params = model_client.generate_request_params(
+        request_body.messages,
+        
+    )
     
     is_reasoning = request.model == GROK3_REASONING_MODEL_NAME
     
