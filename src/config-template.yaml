@@ -1,18 +1,6 @@
 # 认证令牌 (GROK3_AUTH_TOKEN)
 token: "abc123"
 
-# 提示前的文本 (GROK3_BEFORE_PROMPT)
-textBeforePrompt: ""
-
-# 提示后的文本 (GROK3_AFTER_PROMPT)
-textAfterPrompt: ""
-
-# 保留聊天对话 (GROK3_KEEP_CHAT)
-keepChat: false
-
-# 忽略思考 (GROK3_IGNORE_THINKING)
-ignoreThinking: false
-
 # HTTP代理 (GROK3_HTTP_PROXY)
 httpProxy: ""
 

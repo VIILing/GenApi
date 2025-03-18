@@ -61,7 +61,6 @@ class Grok3Client(AbsModelClient):
         
         # 构建并返回完整的请求负载
         payload = {
-            "deepsearchPreset": "",
             "disableSearch": False,
             "enableImageGeneration": True,
             "enableImageStreaming": True,

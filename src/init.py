@@ -5,10 +5,6 @@ from utils import ThreadSafeCookieManagerClass
 import yaml
 
 CHAT_REQ_TOKEN = "abc123"
-TEXT_BEFORE_PROMPT = ""
-TEXT_AFTER_PROMPT = ""
-KEEP_CHAT = False
-IGNORE_THINKING = False
 HTTP_PROXY = ""
 CF_PROXY_URL = ""
 CookieManager = ThreadSafeCookieManagerClass.load_cookies_from_files()
@@ -28,18 +24,10 @@ def __parse():
     with open('config.yaml', 'r', encoding='utf-8') as f:
         config = yaml.safe_load(f)
 
-    global CHAT_REQ_TOKEN, TEXT_BEFORE_PROMPT, TEXT_AFTER_PROMPT, KEEP_CHAT, IGNORE_THINKING, HTTP_PROXY, CF_PROXY_URL
+    global CHAT_REQ_TOKEN, HTTP_PROXY, CF_PROXY_URL
 
     if config.get('token'):
         CHAT_REQ_TOKEN = config['token']
-    if config.get('textBeforePrompt'):
-        TEXT_BEFORE_PROMPT = config['textBeforePrompt']
-    if config.get('textAfterPrompt'):
-        TEXT_AFTER_PROMPT = config['textAfterPrompt']
-    if config.get('keepChat'):
-        KEEP_CHAT = True
-    if config.get('ignoreThinking'):
-        IGNORE_THINKING = True
     if config.get('httpProxy'):
         HTTP_PROXY = config['httpProxy']
     if config.get('cfProxyUrl'):
