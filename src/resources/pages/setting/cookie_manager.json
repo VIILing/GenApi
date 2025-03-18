@@ -416,7 +416,8 @@
           "title": "最后更新时间",
           "name": "last_update_times",
           "id": "u:9078f4ed1a03",
-          "placeholder": "-"
+          "placeholder": "-",
+          "sorter": true
         },
         {
           "type": "tpl",

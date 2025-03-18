@@ -36,6 +36,10 @@ class BaseCookie(ABC):
         self.has_been_deleted = False
         self.continues_error_time = []  # 记录连续失败的时间列表
         self.last_update_times = datetime.now()  # 记录最后更新时间，默认为创建时间
+
+    @staticmethod
+    def format_datetime(obj: datetime) -> str:
+        return obj.strftime('%Y-%m-%d %H:%M:%S')
         
     @abstractmethod
     def get_classification(self) -> str:
@@ -73,12 +77,12 @@ class BaseCookie(ABC):
             "cookie": self.cookie,
             "success_count": self.success_count,
             "fail_count": self.fail_count,
-            "last_success_time": self.last_success_time.isoformat() if self.last_success_time else None,
-            "last_fail_time": self.last_fail_time.isoformat() if self.last_fail_time else None,
+            "last_success_time": self.format_datetime(self.last_success_time) if self.last_success_time else None,
+            "last_fail_time": self.format_datetime(self.last_fail_time) if self.last_fail_time else None,
             "last_error": self.last_error,
             "is_occupied": self.is_occupied,
             "continues_error_count": len(self.continues_error_time),
-            "last_update_times": self.last_update_times.isoformat() if self.last_update_times else None
+            "last_update_times": self.format_datetime(self.last_update_times) if self.last_update_times else None
         }
         
         
