@@ -8,7 +8,7 @@ from typing import Any, Optional, AsyncGenerator, Union
 import httpx
 import requests as rq
 
-from src.routers.openai_models import (
+from routers.openai_models import (
     BaseChatCompletionBody,
     OpenAIChatCompletion,
     OpenAIChatCompletionChoice,
@@ -17,7 +17,7 @@ from src.routers.openai_models import (
     OpenAIChatCompletionChunk,
     OpenAIChatCompletionChunkChoice,
 )
-from src.utils import generate_uuid, must_marshal, CookieMsg
+from utils import generate_uuid, must_marshal, CookieMsg
 
 
 class AbsNetClient(ABC):

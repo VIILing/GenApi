@@ -3,13 +3,12 @@ import json
 import logging
 from typing import Any, Optional, AsyncGenerator
 
-from src.routers.clients.client import AbsModelClient, RequestParams, RequestResponse
-from src.routers.clients.client import AsyncNetClient
-from src.routers.openai_models import (
+from routers.clients.client import AsyncNetClient, AbsModelClient, RequestParams, RequestResponse
+from routers.openai_models import (
     Grok3ChatCompletionBody
 )
-from src.utils import generate_uuid, CookieMsg
-from .constants import (
+from utils import generate_uuid, CookieMsg
+from routers.clients.grok.constants import (
     NEW_CHAT_URL,
     UPLOAD_FILE_URL,
     GROK3_REASONING_MODEL_NAME,
@@ -19,7 +18,7 @@ from .constants import (
     DEFAULT_UPLOAD_MESSAGE,
     DEFAULT_BEFORE_TEXT_PROMPT,
 )
-from .models import ToolOverrides, UploadFileRequest
+from routers.clients.grok.models import ToolOverrides, UploadFileRequest
 
 logger = logging.getLogger('GenApi.GrokClient')
 

@@ -2,6 +2,9 @@
 venv/
 test/
 src/__pycache__/
+src/routers/__pycache__/
+src/routers/clients/__pycache__/
+src/routers/clients/grok/__pycache__/
 src/cookies/
 src/logs/
 src/config.yaml

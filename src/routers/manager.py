@@ -11,7 +11,7 @@ from fastapi.security import HTTPBasic, HTTPBasicCredentials
 from pydantic import BaseModel
 
 # 本地
-from src.init import ViewerUser, AdminUser, CookieManager
+from init import ViewerUser, AdminUser, CookieManager
 
 _Security = HTTPBasic()
 

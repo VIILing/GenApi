@@ -10,14 +10,13 @@ from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from sse_starlette.sse import EventSourceResponse
 
 # 本地
-from src import cf_proxy
-from src.init import CF_PROXY_URL
-from src.init import CHAT_REQ_TOKEN, CookieManager
-from src.routers.clients.client import AbsModelClient, RequestParams, RequestResponse
-from src.routers.clients.grok.client import Grok3Client
-from src.routers.clients.grok.constants import GROK3_MODEL_NAME, GROK3_REASONING_MODEL_NAME
-from src.routers.openai_models import *
-from src.utils import CookieMsg
+import cf_proxy
+from init import CF_PROXY_URL, CHAT_REQ_TOKEN, CookieManager
+from routers.clients.client import AbsModelClient, RequestParams, RequestResponse
+from routers.clients.grok.client import Grok3Client
+from routers.clients.grok.constants import GROK3_MODEL_NAME, GROK3_REASONING_MODEL_NAME
+from routers.openai_models import *
+from utils import CookieMsg
 
 
 security = HTTPBearer()

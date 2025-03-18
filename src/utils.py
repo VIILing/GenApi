@@ -104,7 +104,7 @@ class ThreadSafeCookieManagerClass:
             filename = filenames[i] if filenames and i < len(filenames) else ""
             self.cookies[i] = GrokCookie(i, cookie, filename)
             
-        self.next_idx = max(self.cookies.keys()) + 1
+        self.next_idx = max(self.cookies.keys()) + 1 if len(self.cookies) >= 1 else 0
 
     def get_cookie(self, classification: Optional[str] = None) -> Optional[CookieMsg]:
         """
