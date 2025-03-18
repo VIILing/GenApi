@@ -9,10 +9,17 @@ from pathlib import Path
 from abc import ABC, abstractmethod
 from typing import List, Dict, Any, Optional, Union
 from typing_extensions import Self
+from dataclasses import dataclass
 
 
 # 设置日志
 logger = logging.getLogger("GenApi.utils")
+
+
+@dataclass(frozen=True)
+class CookieMsg:
+    index: int
+    cookie: str
 
 
 class BaseCookie(ABC):
@@ -101,12 +108,12 @@ class ThreadSafeCookieManagerClass:
             
         self.next_idx = max(self.cookies.keys()) + 1
 
-    def get_cookie(self, classification: Optional[str] = None) -> tuple[Optional[int], Optional[str]]:
+    def get_cookie(self, classification: Optional[str] = None) -> Optional[CookieMsg]:
         """
         获取下一个可用的cookie
         
         Returns:
-            (cookie索引, cookie字符串)的元组，如果没有可用cookie则返回(None, None)
+            
         """
         with self.lock:
             # 筛选可用的cookie
@@ -138,15 +145,15 @@ class ThreadSafeCookieManagerClass:
             
             if not available_cookies:
                 logger.warning("没有可用的Cookie，所有Cookie都在使用中或不符合使用条件")
-                return None, None
+                return None
             
             # 选择使用次数最少的cookie
             min_use = min(available_cookies, key=lambda x: (x.success_count + x.fail_count))
             min_use.mark_occupied()
             
-            return min_use.index, min_use.cookie
+            return CookieMsg(min_use.index, min_use.cookie)
    
-    def release_cookie(self, cookie_index: int, error_msg: str = None):
+    def release_cookie(self, cookie_msg: CookieMsg, error_msg: str = None):
         """
         释放指定cookie索引并更新其统计信息
         
@@ -155,13 +162,13 @@ class ThreadSafeCookieManagerClass:
             error_msg: 如果失败，错误信息
         """
         with self.lock:
-            if cookie_index is not None and cookie_index in self.cookies:
+            if cookie_msg.index in self.cookies:
                 # 释放 cookie 并更新统计信息
-                self.cookies[cookie_index].mark_unoccupied(error_msg)
+                self.cookies[cookie_msg.index].mark_unoccupied(error_msg)
                     
                 # 如果是403错误，记录特殊日志
                 if error_msg and "403" in error_msg:
-                    logger.warning(f"Cookie {cookie_index} 收到403错误: {error_msg}")
+                    logger.warning(f"Cookie {cookie_msg.index} 收到403错误: {error_msg}")
     
     def get_cookie_stats(self) -> List[Dict[str, Any]]:
         """

@@ -1,0 +1,17 @@
+[MESSAGES CONTROL]
+# C0303: 
+# W1203: use %s instead f-string at log
+# C0115: missing class document
+# C0116: missing function document
+# C0301: Line too long
+# C0304: Final newline missing
+# W0401: Wildcard import conf
+# C0411: wrong-import-order
+# C0114: missing-module-docstring
+# 
+# W0614: unused-wildcard-import
+# C0413: Import "import re_pull_pje" should be placed at the top of the module
+# W0603: Using the global statement
+# W0105: String statement has no effect
+# C0112: Empty method docstring
+disable=C0303,W1203,C0115,C0116,C0301,C0304,W0401,C0411,C0114,W0718,W0614,C0413,W0603,W0105,C0112

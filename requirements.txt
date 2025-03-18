@@ -2,6 +2,7 @@ fastapi[standard]
 uvicorn
 pydantic
 pydantic_settings
+requests
 httpx
 python-dotenv
 sse-starlette

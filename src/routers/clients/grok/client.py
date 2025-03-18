@@ -8,7 +8,7 @@ from io import BytesIO
 import logging
 from abc import ABC, abstractmethod
 
-from models import (
+from .models import (
     ToolOverrides, 
     UploadFileRequest, 
     UploadFileResponse, 
@@ -20,7 +20,7 @@ from models import (
     OpenAIChatCompletionChoice,
     OpenAIChatCompletionUsage
 )
-from constants import (
+from .constants import (
     NEW_CHAT_URL,
     UPLOAD_FILE_URL,
     GROK3_MODEL_NAME,
@@ -29,13 +29,13 @@ from constants import (
     MESSAGE_CHARS_LIMIT,
     DEFAULT_UPLOAD_MESSAGE_PROMPT
 )
-from utils import generate_uuid, must_marshal
+from src.routers.clients.client import ModelClient
 
 
 logger = logging.getLogger('GenApi.GrokClient')
 
 
-class GrokApiError(Exception):
+class Grok3Client(ModelClient):
     pass
 
 
@@ -756,7 +756,3 @@ class SyncGrokClient(BaseGrokClient):
                 logger.warning(f"警告: 无法解析JSON: {line}")
             except Exception as e:
                 logger.warning(f"警告: 处理响应时出错: {e}")
-
-
-# 向后兼容的类别名
-GrokClient = AsyncGrokClient 

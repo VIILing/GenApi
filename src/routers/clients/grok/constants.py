@@ -6,10 +6,6 @@ UPLOAD_FILE_URL = "https://grok.com/rest/app-chat/upload-file"      # 上传文�
 GROK3_MODEL_NAME = "grok-3"
 GROK3_REASONING_MODEL_NAME = "grok-3-reasoning"
 
-# API路径
-COMPLETIONS_PATH = "/v1/chat/completions"
-LIST_MODELS_PATH = "/v1/models"
-
 # 将消息作为文件上传
 DEFAULT_UPLOAD_MESSAGE = False
 MESSAGE_CHARS_LIMIT = 50000
