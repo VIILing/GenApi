@@ -6,6 +6,8 @@ UPLOAD_FILE_URL = "https://grok.com/rest/app-chat/upload-file"      # 上传文�
 GROK3_MODEL_NAME = "grok-3"
 GROK3_REASONING_MODEL_NAME = "grok-3-reasoning"
 
+DEFAULT_BEFORE_TEXT_PROMPT = """For the data below, entries with '[[system]]' are system information, entries with '[[assistant]]' are messages you have previously sent, entries with '[[user]]' are messages sent by the user. You need to respond to the user's last message accordingly based on the corresponding data."""
+
 # 将消息作为文件上传
 DEFAULT_UPLOAD_MESSAGE = False
 MESSAGE_CHARS_LIMIT = 50000

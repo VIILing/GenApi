@@ -1,4 +1,5 @@
-from typing import Optional, List
+from typing import Optional, List, Union
+
 from pydantic import BaseModel, Field
 
 
@@ -69,17 +70,20 @@ class ModelList(BaseModel):
     data: List[ModelData] = Field(..., description="模型数据列表")
 
 
-# 请求体结构体，对应Go中的RequestBody
-class RequestBody(BaseModel):
+# 聊天补全请求体结构体
+class BaseChatCompletionBody(BaseModel):
     """表示POST请求到/v1/chat/completions端点的JSON主体结构"""
     model: str = Field(..., description="模型选择")
     messages: List[OpenAIChatCompletionMessage] = Field(..., description="消息列表")
     stream: bool = Field(False, description="是否流式响应")
-    # grokCookies: Optional[Union[str, List[str]]] = Field(None, description="单个cookie(string)或cookie列表([]string)")
-    # cookieIndex: Optional[int] = Field(None, description="从1开始，0表示自动轮换选择cookie")
-    # enableSearch: Optional[int] = Field(None, description="> 0 为 true，== 0 为 false")
-    # uploadMessage: Optional[int] = Field(None, description="> 0 为 true，== 0 为 false")
-    # textBeforePrompt: Optional[str] = Field(None, description="提示前的文本")
-    # textAfterPrompt: Optional[str] = Field(None, description="提示后的文本")
-    # keepChat: Optional[int] = Field(None, description="> 0 为 true，== 0 为 false")
-    # ignoreThinking: Optional[int] = Field(None, description="> 0 为 true，== 0 为 false")
+    
+    
+class Grok3ChatCompletionBody(BaseChatCompletionBody):
+    grokCookies: Optional[Union[str, List[str]]] = Field(None, description="单个cookie(string)或cookie列表([]string)")
+    cookieIndex: Optional[int] = Field(None, description="从1开始，0表示自动轮换选择cookie")
+    enableSearch: Optional[int] = Field(None, description="> 0 为 true，== 0 为 false")
+    uploadMessage: Optional[int] = Field(None, description="> 0 为 true，== 0 为 false")
+    textBeforePrompt: Optional[str] = Field(None, description="提示前的文本")
+    textAfterPrompt: Optional[str] = Field(None, description="提示后的文本")
+    keepChat: Optional[int] = Field(None, description="> 0 为 true，== 0 为 false")
+    ignoreThinking: Optional[int] = Field(None, description="> 0 为 true，== 0 为 false")

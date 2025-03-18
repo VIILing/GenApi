@@ -2,6 +2,7 @@ import logging
 
 logger = logging.getLogger('GenApi.cf_proxy')
 
+
 class BrightDataProxy:
     """
     Bright Data 代理配置工具类

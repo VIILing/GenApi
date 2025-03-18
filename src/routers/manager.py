@@ -1,47 +1,36 @@
 # 内置库
-import os
 import logging
+import os
+import secrets
 from typing import Optional, Annotated
-from contextlib import asynccontextmanager
 
 # 三方库
-from fastapi import FastAPI, HTTPException, Request, Depends, status
-from fastapi.responses import JSONResponse, Response, HTMLResponse
-from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials, HTTPBasic, HTTPBasicCredentials
-from fastapi.staticfiles import StaticFiles
+from fastapi import HTTPException, Depends, status, APIRouter
+from fastapi.responses import HTMLResponse
+from fastapi.security import HTTPBasic, HTTPBasicCredentials
 from pydantic import BaseModel
-from sse_starlette.sse import EventSourceResponse
-import yaml
-import secrets
 
 # 本地
-import cf_proxy
-from client import AsyncGrokClient, SyncGrokClient, BaseGrokClient, GrokApiError
-from models import ModelList, ModelData, RequestBody
-from constants import (
-    GROK3_MODEL_NAME,
-    GROK3_REASONING_MODEL_NAME,
-    COMPLETIONS_PATH,
-    LIST_MODELS_PATH,
-    DEFAULT_UPLOAD_MESSAGE
-)
-from utils import ThreadSafeCookieManagerClass
-
+from src.init import ViewerUser, AdminUser, CookieManager
 
 _Security = HTTPBasic()
+
+
+Router = APIRouter(prefix='/web')
+logger = logging.getLogger("GenApi.chat")
 
 
 def verify_viewer(
     credentials: Annotated[HTTPBasicCredentials, Depends(_Security)],
 ):
     current_username_bytes = credentials.username.encode("utf8")
-    if current_username_bytes not in _ViewerUser:
+    if current_username_bytes not in ViewerUser:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Incorrect username or password",
             headers={"WWW-Authenticate": "Basic"},
         )
-    current_password_bytes = _ViewerUser[current_username_bytes]
+    current_password_bytes = ViewerUser[current_username_bytes]
     is_correct_password = secrets.compare_digest(
         current_password_bytes, credentials.password.encode("utf8")
     )
@@ -58,12 +47,12 @@ def verify_admin(
     credentials: Annotated[HTTPBasicCredentials, Depends(_Security)],
 ):
     current_username_bytes = credentials.username.encode("utf8")
-    if current_username_bytes not in _AdminUser:
+    if current_username_bytes not in AdminUser:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Insufficient permissions"
         )
-    current_password_bytes = _AdminUser[current_username_bytes]
+    current_password_bytes = AdminUser[current_username_bytes]
     is_correct_password = secrets.compare_digest(
         current_password_bytes, credentials.password.encode("utf8")
     )
@@ -75,7 +64,7 @@ def verify_admin(
     return credentials.username
 
 
-@app.get("/logout")
+@Router.get("/logout")
 async def logout():
     # 返回一个 401 状态码，并设置 WWW-Authenticate 头来提示客户端重新认证
     raise HTTPException(
@@ -85,12 +74,12 @@ async def logout():
     )
 
 
-with open(os.path.join(os.path.split(__file__)[0], 'resources', 'amis_template.html'), 'r', encoding='utf-8') as _fn:
+with open(os.path.join(os.path.split(__file__)[0], '..', 'resources', 'amis_template.html'), 'r', encoding='utf-8') as _fn:
     AmisTemplate = _fn.read()
 
 
 PageJsonCache: dict[str, str] = dict()
-for _root, _dirs, _files in os.walk(os.path.join(os.path.split(__file__)[0], 'resources', 'pages')):
+for _root, _dirs, _files in os.walk(os.path.join(os.path.split(__file__)[0], '..', 'resources', 'pages')):
     for _name in _files:
         with open(os.path.join(_root, _name), 'r', encoding='utf-8') as _fn:
             _json_content = _fn.read()
@@ -114,7 +103,7 @@ def render_html(json_content: str) -> HTMLResponse:
     return HTMLResponse(content=AmisTemplate.format(json_body=json_content), status_code=200)
 
 
-@app.get("/web/setting/cookie_manager")
+@Router.get("/web/setting/cookie_manager")
 async def web_setting_cookie_manager(_: str = Depends(verify_viewer)):
     json_content = PageJsonCache.get("cookie_manager.json")
     if json_content is None:
@@ -122,7 +111,7 @@ async def web_setting_cookie_manager(_: str = Depends(verify_viewer)):
     return render_html(json_content)
 
 
-@app.get("/api/setting/cookie-stats")
+@Router.get("/api/setting/cookie-stats")
 async def get_cookie_stats(
     cookie_index: Optional[int] = None,
     _: str = Depends(verify_viewer)
@@ -153,7 +142,7 @@ class UpdateCookieRequest(BaseModel):
     cookie: str
     
 
-@app.post("/api/setting/update-cookie")
+@Router.post("/api/setting/update-cookie")
 async def update_cookie(
     request: UpdateCookieRequest,
     _: str = Depends(verify_admin)
@@ -187,7 +176,7 @@ class IsEnableCookieRequest(BaseModel):
     is_enable: bool
     
 
-@app.post("/api/setting/is-enable-cookie")
+@Router.post("/api/setting/is-enable-cookie")
 async def is_enable_cookie(
     request: IsEnableCookieRequest,
     _: str = Depends(verify_admin)
@@ -218,7 +207,7 @@ class AddCookieRequest(BaseModel):
     cookie: str
 
 
-@app.post("/api/setting/add-cookie")
+@Router.post("/api/setting/add-cookie")
 async def add_cookie(
     request: AddCookieRequest,
     _: str = Depends(verify_admin)
@@ -251,7 +240,7 @@ class DeleteCookieRequest(BaseModel):
     cookie_index: int
 
 
-@app.post("/api/setting/delete-cookie")
+@Router.post("/api/setting/delete-cookie")
 async def delete_cookie(
     request: DeleteCookieRequest,
     _: str = Depends(verify_admin)

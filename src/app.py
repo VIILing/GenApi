@@ -2,15 +2,14 @@
 import logging
 from contextlib import asynccontextmanager
 
+import yaml
 # 三方库
 from fastapi import FastAPI, Request
 from fastapi.responses import Response
 from fastapi.staticfiles import StaticFiles
-import yaml
 
 # 本地
 from init import *
-
 
 # 配置日志
 logging.basicConfig(

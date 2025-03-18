@@ -1,16 +1,14 @@
 import json
+import logging
 import os
 import threading
 import uuid
-import time
-import logging
-from datetime import datetime, timedelta
-from pathlib import Path
 from abc import ABC, abstractmethod
-from typing import List, Dict, Any, Optional, Union
-from typing_extensions import Self
 from dataclasses import dataclass
+from datetime import datetime, timedelta
+from typing import List, Dict, Any, Optional
 
+from typing_extensions import Self
 
 # 设置日志
 logger = logging.getLogger("GenApi.utils")
@@ -165,10 +163,6 @@ class ThreadSafeCookieManagerClass:
             if cookie_msg.index in self.cookies:
                 # 释放 cookie 并更新统计信息
                 self.cookies[cookie_msg.index].mark_unoccupied(error_msg)
-                    
-                # 如果是403错误，记录特殊日志
-                if error_msg and "403" in error_msg:
-                    logger.warning(f"Cookie {cookie_msg.index} 收到403错误: {error_msg}")
     
     def get_cookie_stats(self) -> List[Dict[str, Any]]:
         """

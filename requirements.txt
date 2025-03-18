@@ -6,3 +6,4 @@ requests
 httpx
 python-dotenv
 sse-starlette
+pyyaml

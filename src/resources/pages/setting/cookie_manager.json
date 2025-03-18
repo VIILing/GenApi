@@ -900,7 +900,7 @@
                 "actionType": "ajax",
                 "options": {},
                 "api": {
-                  "url": "/logout",
+                  "url": "/web/logout",
                   "method": "get",
                   "requestAdaptor": "",
                   "adaptor": "",

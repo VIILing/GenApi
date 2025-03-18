@@ -1,26 +1,23 @@
 # 内置库
-import os
 import logging
-from typing import Optional, List, Union
-from contextlib import asynccontextmanager
+import time
+from typing import AsyncGenerator
 
 # 三方库
-from fastapi import FastAPI, HTTPException, Request, Depends, status, APIRouter
-from fastapi.responses import JSONResponse, Response, HTMLResponse
-from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials, HTTPBasic, HTTPBasicCredentials
-from fastapi.staticfiles import StaticFiles
-from pydantic import BaseModel, Field
+from fastapi import HTTPException, Depends, APIRouter
+from fastapi.responses import JSONResponse
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from sse_starlette.sse import EventSourceResponse
-import yaml
-import secrets
 
 # 本地
-from src.init import CHAT_REQ_TOKEN, CookieManager
 from src import cf_proxy
-from src.routers.openai_models import *
-from src.routers.clients.client import ModelClient
+from src.init import CF_PROXY_URL
+from src.init import CHAT_REQ_TOKEN, CookieManager
+from src.routers.clients.client import AbsModelClient, RequestParams, RequestResponse
 from src.routers.clients.grok.client import Grok3Client
 from src.routers.clients.grok.constants import GROK3_MODEL_NAME, GROK3_REASONING_MODEL_NAME
+from src.routers.openai_models import *
+from src.utils import CookieMsg
 
 
 security = HTTPBearer()
@@ -64,6 +61,10 @@ Router = APIRouter(prefix='/chat', dependencies=[Depends(verify_chat_req)])
 logger = logging.getLogger("GenApi.chat")
 
 
+class UnknownError(Exception):
+    pass
+
+
 @Router.get("/v1/models")
 async def list_models(
     _: str = Depends(verify_chat_req)
@@ -88,18 +89,10 @@ async def list_models(
 
 @Router.post("/v1/chat/completions")
 async def chat_completion(
-    request_body: RequestBody,
+    request_body: BaseChatCompletionBody,
     _: str = Depends(verify_chat_req)
 ):
     """
-    处理聊天完成请求
-    
-    Args:
-        request: 请求体
-        _: 认证
-        
-    Returns:
-        聊天完成响应
     """
     
     # 检查消息
@@ -124,279 +117,142 @@ async def chat_completion(
         )
         
     # 确定模型
-    model_client: ModelClient
+    model_client: AbsModelClient
     if request_body.model in {GROK3_MODEL_NAME, GROK3_REASONING_MODEL_NAME}:
-        model_client = Grok3Client()
+        model_client = Grok3Client(logger, {})
     else:
         raise HTTPException(
             status_code=503,
             detail="请求的模型不存在"
         )
     
-    # 确定配置标志
-    request_params = model_client.generate_request_params(
-        request_body.messages,
-        
-    )
-    
-    is_reasoning = request.model == GROK3_REASONING_MODEL_NAME
-    
-    enable_search = False
-    if request.enableSearch is not None and request.enableSearch > 0:
-        enable_search = True
-    
-    upload_message = DEFAULT_UPLOAD_MESSAGE
-    if request.uploadMessage is not None and request.uploadMessage > 0:
-        upload_message = True
-    
-    keep_conversation = KEEP_CHAT
-    if request.keepChat is not None:
-        keep_conversation = request.keepChat > 0
-    
-    ignore_think = IGNORE_THINKING
-    if request.ignoreThinking is not None:
-        ignore_think = request.ignoreThinking > 0
-    
-    # 构建要发送给Grok 3的消息
-    before_prompt = request.textBeforePrompt or TEXT_BEFORE_PROMPT
-    after_prompt = request.textAfterPrompt or TEXT_AFTER_PROMPT
-    
-    message_text = f"{before_prompt}\n"
-    for msg in request.messages:
-        message_text += f"\n[[{msg.role}]]\n{msg.content}"
-    message_text += f"\n{after_prompt}"
-
-    # 创建异步客户端尝试直接请求
-    grok_client: BaseGrokClient = AsyncGrokClient(
-        cookie=cookie,
-        is_reasoning=is_reasoning,
-        enable_search=enable_search,
-        upload_message=upload_message,
-        keep_chat=keep_conversation,
-        ignore_thinking=ignore_think,
-        proxy=HTTP_PROXY
-    )
+    request_params = model_client.generate_request_params(request_body, cookie_msg)
 
     try:
         # 尝试使用异步客户端直接请求
-        logger.info("尝试直接请求Grok API（异步客户端）")
-        return await _chat_completion_request(request, cookie_index, grok_client, message_text)
+        logger.info("尝试使用异步客户端直接请求")
+        return await _chat_completion(True, request_body.stream, model_client, request_params, cookie_msg)
     
-    except GrokRequestException as e:
+    except HTTPException as e:
         # 直接请求失败，检查是否配置了CF代理
-        logger.warning(f"直接请求Grok API失败: {e.message}")
+        logger.info(f"异步直接请求失败: {e}")
         
         if CF_PROXY_URL is None or CF_PROXY_URL == '':
-            logger.error("未配置CF绕过代理，无法进行重试")
-            # 确保在返回错误前关闭客户端
-            await grok_client.close()
-            # 释放cookie
-            CookieManager.release_cookie(cookie_index, f"未配置CF绕过代理: {e.message}")
+            logger.info("未配置CF绕过代理，无法进行重试")
             raise HTTPException(
                 status_code=500,
-                detail=f"请求Grok API失败，且未配置CF绕过代理: {e.message}"
+                detail=f"异步直接请求失败，且未配置CF绕过代理，请求结束。异常: {e}"
             ) from e
+
+        # 尝试使用同步客户端和CF代理进行重试
+        logger.info("尝试使用CF绕过代理和同步客户端进行重试")
         
-        try:
-            # 尝试使用同步客户端和CF代理进行重试
-            logger.info("尝试使用CF绕过代理和同步客户端进行重试")
-            
-            # 确保原客户端已关闭
-            await grok_client.close()
-            
-            # 获取CF代理配置
-            proxy_url = cf_proxy.BrightDataProxy.get_normal_proxy(CF_PROXY_URL)
-            logger.debug(f"使用CF绕过代理: {proxy_url}")
-            
-            # 创建新的同步客户端使用CF代理
-            cf_grok_client: BaseGrokClient = SyncGrokClient(
-                cookie=cookie,
-                is_reasoning=is_reasoning,
-                enable_search=enable_search,
-                upload_message=upload_message,
-                keep_chat=keep_conversation,
-                ignore_thinking=ignore_think,
-                proxy=proxy_url
-            )
-            
-            # 使用同步客户端和CF代理重试请求
-            return await _chat_completion_request(request, cookie_index, cf_grok_client, message_text)
+        # 获取CF代理配置
+        proxy_url = cf_proxy.BrightDataProxy.get_normal_proxy(CF_PROXY_URL)
+        logger.debug(f"使用CF绕过代理: {proxy_url}")
         
-        except Exception as cf_error:
-            # CF代理请求也失败
-            logger.error(f"使用CF绕过代理和同步客户端请求失败: {str(cf_error)}")
-            
-            # 释放cookie
-            CookieManager.release_cookie(cookie_index, f"使用CF绕过代理和同步客户端请求失败: {str(cf_error)}")
-            
-            raise HTTPException(
-                status_code=500,
-                detail=f"使用直接请求和CF绕过代理均失败。直接请求错误: {e.message}，CF代理错误: {str(cf_error)}"
-            ) from e
-        
-    except GrokApiError as e:
-        # Grok API错误（包括403等CF拦截）
-        error_msg = f"Grok API请求错误: {str(e)}"
-        logger.error(error_msg)
-        
-        # 释放cookie，标记为失败
-        if cookie_index is not None:
-            # 检查是否是403错误
-            is_403_error = "403" in str(e)
-            if is_403_error:
-                error_msg = f"CloudFlare 403错误: {str(e)}"
-                logger.warning(f"Cookie {cookie_index} 收到403错误，可能被CloudFlare拦截")
-            
-            CookieManager.release_cookie(cookie_index, error_msg)
-        
-        await grok_client.close()  # 发生错误时关闭客户端
-        
-        # 特殊处理403错误
-        if "403" in str(e):
-            # 返回403状态码和详细错误信息
-            return JSONResponse(
-                status_code=403,
-                content={
-                    "error": {
-                        "message": "CloudFlare拦截请求，请稍后再试或使用其他Cookie",
-                        "type": "cf_blocked",
-                        "param": None,
-                        "code": 403
-                    }
-                }
-            )
-        
-        raise GrokRequestException(error_msg) from e
-        
-    except Exception as e:
-        # 其他未预期的异常
-        logger.error(f"处理请求时发生未知异常: {str(e)}")
-        
-        # 确保客户端已关闭并释放cookie
-        await grok_client.close()
-        CookieManager.release_cookie(cookie_index, f"处理请求时发生未知异常: {str(e)}")
-        
-        raise HTTPException(
-            status_code=500,
-            detail=f"处理请求时发生未知异常: {str(e)}"
-        ) from e
+        request_params.proxy = proxy_url
+        # 使用同步客户端和CF代理重试请求
+        return await _chat_completion(False, False, model_client, request_params, cookie_msg)
 
 
-async def _chat_completion_request(
-        request: RequestBody,
-        cookie_index: int,
-        grok_client: BaseGrokClient,
-        message_text: str
+async def _chat_completion(
+        is_async: bool,
+        is_stream: bool,
+        model_client: AbsModelClient,
+        req_params: RequestParams,
+        cookie_msg: CookieMsg
     ):
     """
-    执行Grok API请求
-    
-    Args:
-        request: 请求体
-        cookie_index: cookie索引
-        grok_client: BaseGrokClient实例
-        message_text: 消息文本
-    
-    Returns:
-        流式或非流式响应
-    
-    Raises:
-        GrokRequestException: 如果请求失败
+    执行聊天补全请求
     """
-    try:
-        # 根据请求类型选择适当的响应方式
-        if request.stream:
-            # 流式响应
-            logger.info("处理流式响应请求")
+    
+    if is_async:
+        if is_stream:
             # 对于流式响应，客户端会在生成器内部关闭，而不是在这里关闭
-            return EventSourceResponse(_stream_with_cookie_cleanup(grok_client, message_text, cookie_index))
+            # 在返回了 EventSourceResponse 之后，会立刻执行 finally 块
+            return EventSourceResponse(_async_stream_with_cookie_cleanup(model_client, req_params, cookie_msg))
         else:
-            # 非流式响应，收集完整结果
-            logger.info("处理非流式响应请求")
+            # 异步非流式响应，收集完整结果
             try:
-                full_response = await grok_client.full_response(message_text)
-                
-                # 释放cookie
-                CookieManager.release_cookie(cookie_index)
-                
-                # 返回OpenAI格式的响应
-                return JSONResponse(content=grok_client.create_openai_full_response_body(full_response))
-            finally:
-                # 只在非流式响应时关闭客户端
-                await grok_client.close()
-
-    except GrokApiError as e:
-        # Grok API错误（包括403等CF拦截）
-        error_msg = f"Grok API请求错误: {str(e)}"
-        logger.error(error_msg)
-        
-        # 释放cookie，标记为失败
-        if cookie_index is not None:
-            # 检查是否是403错误
-            is_403_error = "403" in str(e)
-            if is_403_error:
-                error_msg = f"CloudFlare 403错误: {str(e)}"
-                logger.warning(f"Cookie {cookie_index} 收到403错误，可能被CloudFlare拦截")
-            
-            CookieManager.release_cookie(cookie_index, error_msg)
-        
-        await grok_client.close()  # 发生错误时关闭客户端
-        
-        # 特殊处理403错误
-        if "403" in str(e):
-            # 返回403状态码和详细错误信息
-            return JSONResponse(
-                status_code=403,
-                content={
-                    "error": {
-                        "message": "CloudFlare拦截请求，请稍后再试或使用其他Cookie",
-                        "type": "cf_blocked",
-                        "param": None,
-                        "code": 403
-                    }
-                }
-            )
-        
-        raise GrokRequestException(error_msg) from e
-        
-    except Exception as e:
-        # 其他异常
-        error_msg = f"处理请求时发生异常: {str(e)}"
-        logger.error(error_msg)
-        
-        # 释放cookie
-        if cookie_index is not None:
-            CookieManager.release_cookie(cookie_index, error_msg)
-            
-        await grok_client.close()  # 发生错误时关闭客户端
-        
-        raise GrokRequestException(error_msg) from e
+                full_response = await model_client.async_full_response(req_params)
+                CookieManager.release_cookie(cookie_msg, full_response.error_msg)
+                if full_response.error_msg is None:
+                    return JSONResponse(content=model_client.create_openai_full_response_body(full_response.data.decode()))
+                else:
+                    raise HTTPException(
+                        status_code=500,
+                        detail=full_response.error_msg
+                    )
+            except Exception as e:
+                model_name = model_client.get_model_name()
+                error_msg = f"模型 {model_name} 在处理异步完整数据的过程中，出现非预期的错误：{e}"
+                CookieManager.release_cookie(cookie_msg, error_msg)
+                logger.error(error_msg)
+                raise HTTPException(
+                    status_code=500,
+                    detail=error_msg
+                ) from e
+    else:
+        try:
+            full_response = model_client.sync_full_response(req_params)  # 考虑之后丢线程池，不要阻塞住主进程。
+            CookieManager.release_cookie(cookie_msg, full_response.error_msg)
+            if full_response.error_msg is None:
+                return JSONResponse(content=model_client.create_openai_full_response_body(full_response.data.decode()))
+            else:
+                raise HTTPException(
+                    status_code=500,
+                    detail=full_response.error_msg
+                )
+        except Exception as e:
+            model_name = model_client.get_model_name()
+            error_msg = f"模型 {model_name} 在处理同步完整数据的过程中，出现非预期的错误：{e}"
+            CookieManager.release_cookie(cookie_msg, error_msg)
+            logger.error(error_msg)
+            raise HTTPException(
+                status_code=500,
+                detail=error_msg
+            ) from e
 
 
-async def _stream_with_cookie_cleanup(client: BaseGrokClient, message: str, cookie_index: int):
+async def _async_stream_with_cookie_cleanup(
+    model_client: AbsModelClient,
+    req_params:  RequestParams,
+    cookie_msg: CookieMsg
+) -> AsyncGenerator[RequestResponse, None]:
     """
-    包装流式响应生成器，确保在完成后释放cookie和关闭客户端
+    """
     
-    Args:
-        client: BaseGrokClient实例
-        message: 消息内容
-        cookie_index: cookie索引
-        
-    Yields:
-        OpenAI格式的流式响应数据
-    """
     error_msg = None
     try:
-        # 使用客户端的OpenAI流式响应方法
-        async for chunk in client.stream_openai_response(message):
-            logger.debug(f'Yield OpenAi chunk: {chunk}')
-            yield chunk
+        chunk: RequestResponse
+        async for chunk in await model_client.async_stream_response(req_params):
+            if chunk.error_msg is not None:
+                openai_data_block = model_client.convert_token_to_openai_format(
+                    token=chunk.data.decode(),
+                    completion_id=f"chatcmpl-{time.time()}"
+                )
+                yield openai_data_block
+            else:
+                model_name = model_client.get_model_name()
+                error_msg = f"模型 {model_name} 在处理异步流式数据的过程中，出现响应错误：{chunk.error_msg}"
+                logger.error(error_msg)
+                raise HTTPException(
+                    status_code=500,
+                    detail=error_msg
+                )
+        yield "[DONE]"
+
     except Exception as e:
-        logger.error(f"流式响应生成错误: {e}")
-        error_msg = f"流式响应生成错误: {str(e)}"
-        raise
+        model_name = model_client.get_model_name()
+        error_msg = f"模型 {model_name} 在处理异步流式数据的过程中，出现非预期的错误：{e}"
+        logger.error(error_msg)
+        raise HTTPException(
+            status_code=500,
+            detail=error_msg
+        ) from e
+    
     finally:
-        # 释放cookie并关闭客户端
-        logger.debug("流式响应完成，释放cookie和关闭客户端")
-        CookieManager.release_cookie(cookie_index, error_msg)
-        await client.close()  # 流式传输完成后关闭客户端
+        # 释放cookie
+        logger.debug("异步流式响应完成，释放cookie")
+        CookieManager.release_cookie(cookie_msg, error_msg)
