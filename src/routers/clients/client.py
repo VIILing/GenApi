@@ -33,6 +33,8 @@ class AbsNetClient(ABC):
         """
         self.logger = logger
         self.client_kwargs = client_kwargs
+
+        self._enter_flag = False
         
     @staticmethod
     def get_timeout() -> int:
@@ -83,6 +85,15 @@ class AsyncNetClient(AbsNetClient, ABC):
             return True, self.client_kwargs['proxy']
         else:
             return False, ''
+
+    async def __aenter__(self):
+        self._enter_flag = True
+        return self
+
+    async def __aexit__(self, exc_type, exc_val, exc_tb):
+        self._enter_flag = False
+        await self.close()
+        return
     
     async def close(self):
         """
@@ -96,6 +107,9 @@ class AsyncNetClient(AbsNetClient, ABC):
     async def do_request(self, fetch: bool, stream: bool, method: str, url: str, headers: dict[str, str], payload: Any) -> AsyncGenerator[RequestResponse, None]:
         """
         """
+
+        if self._enter_flag is False:
+            raise RuntimeError('You must set instance to with ... block')
 
         # 将请求负载序列化为JSON
         json_payload = json.dumps(payload)
@@ -186,8 +200,13 @@ class SyncNetClient(AbsNetClient, ABC):
             return True, self.client_kwargs['proxy']
         else:
             return False, ''
+
+    def __enter__(self):
+        self._enter_flag = True
+        return self
    
     def __exit__(self, exc_type, exc_value, traceback):
+        self._enter_flag = False
         self.close()
         return False
     

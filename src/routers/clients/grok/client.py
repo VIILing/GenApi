@@ -3,9 +3,16 @@ import json
 import logging
 from typing import Any, Optional, AsyncGenerator
 
-from routers.clients.client import AsyncNetClient, AbsModelClient, RequestParams, RequestResponse
+from routers.clients.client import (
+    AsyncNetClient,
+    SyncNetClient,
+    AbsModelClient,
+    RequestParams,
+    RequestResponse
+)
 from routers.openai_models import (
-    Grok3ChatCompletionBody
+    BaseChatCompletionBody,
+    # Grok3ChatCompletionBody,
 )
 from utils import generate_uuid, CookieMsg
 from routers.clients.grok.constants import (
@@ -32,7 +39,7 @@ class Grok3Client(AbsModelClient):
         """
         return 'grok3'
         
-    def generate_request_params(self, req_body: Grok3ChatCompletionBody, cookie: CookieMsg) -> RequestParams:
+    def generate_request_params(self, req_body: BaseChatCompletionBody, cookie: CookieMsg) -> RequestParams:
         """
         """
 
@@ -43,8 +50,10 @@ class Grok3Client(AbsModelClient):
         tool_overrides: Any = ToolOverrides().model_dump()
 
         # 生成消息文本
-        before_prompt = req_body.textBeforePrompt  if req_body.textBeforePrompt is not None else DEFAULT_BEFORE_TEXT_PROMPT
-        after_prompt = req_body.textAfterPrompt  if req_body.textAfterPrompt is not None else ''
+        # before_prompt = req_body.textBeforePrompt if req_body.textBeforePrompt is not None else DEFAULT_BEFORE_TEXT_PROMPT
+        # after_prompt = req_body.textAfterPrompt if req_body.textAfterPrompt is not None else ''
+        before_prompt = DEFAULT_BEFORE_TEXT_PROMPT
+        after_prompt = ''
         message_text = f"{before_prompt}\n"
         for msg in req_body.messages:
             message_text += f"\n[[{msg.role}]]\n{msg.content}"
@@ -91,15 +100,6 @@ class Grok3Client(AbsModelClient):
     async def async_upload_message_as_file(self, message: str, req_params: RequestParams) -> Optional[str]:
         """
         异步将消息作为文件上传
-        
-        Args:
-            message: 要上传的消息内容
-            
-        Returns:
-            上传文件的响应对象
-            
-        Raises:
-            GrokApiError: 如果上传失败
         """
         # 将消息内容编码为Base64
         content = base64.b64encode(message.encode('utf-8')).decode('utf-8')
@@ -134,7 +134,6 @@ class Grok3Client(AbsModelClient):
     async def async_stream_response(self, req_params: RequestParams) -> AsyncGenerator[RequestResponse, None]:
         """
         """
-        logger.info('准备发送消息')
 
         # 处理超长消息上传为文件
         if DEFAULT_UPLOAD_MESSAGE and len(req_params.message) > MESSAGE_CHARS_LIMIT:
@@ -142,12 +141,12 @@ class Grok3Client(AbsModelClient):
             file_meta_data_id = await self.async_upload_message_as_file(req_params.message, req_params)
 
             if file_meta_data_id is None:
-                raise RuntimeError('Grok3 上传文件失败')
+                raise RuntimeError('Grok3 异步上传消息文件失败')
 
             req_params.payload['fileAttachments'] = [file_meta_data_id]
             req_params.payload['message'] = DEFAULT_UPLOAD_MESSAGE_PROMPT
             req_params.message = DEFAULT_UPLOAD_MESSAGE_PROMPT
-            logger.info('上传消息文件成功。')
+            logger.info('异步上传消息文件成功。')
         
         # 准备请求负载并发送请求
         logger.info('发送流式响应请求')
@@ -176,7 +175,67 @@ class Grok3Client(AbsModelClient):
             msg += chunk.data
         if not found_error:
             yield RequestResponse(None, msg, None)
+
+    def sync_upload_message_as_file(self, message: str, req_params: RequestParams) -> Optional[str]:
+        """
+        同步将消息作为文件上传
+        """
+        # 将消息内容编码为Base64
+        content = base64.b64encode(message.encode('utf-8')).decode('utf-8')
+
+        # 准备上传请求
+        payload = UploadFileRequest(
+            content=content,
+            fileMimeType="text/plain",
+            fileName=f"{generate_uuid()}.txt"
+        )
+
+        logger.info("正在将消息作为文件上传")
+
+        # 发送上传文件请求
+        with SyncNetClient(self.logger, self.client_kwargs) as client:
+            response = client.do_request(
+                fetch=True,
+                stream=False,
+                method="POST",
+                url=UPLOAD_FILE_URL,
+                headers=req_params.headers,
+                payload=payload.model_dump()
+            )
+
+        # 验证响应
+        if response.error_msg is not None or "fileMetadataId" not in json.loads(response.data.decode('utf-8')):
+            self.logger.info("上传文件错误: 响应中没有fileMetadataId字段")
+            return None
+
+        return json.loads(response.data.decode('utf-8'))['fileMetadataId']
         
     def sync_full_response(self, req_params: RequestParams) -> RequestResponse:
         """
         """
+
+        # 处理超长消息上传为文件
+        if DEFAULT_UPLOAD_MESSAGE and len(req_params.message) > MESSAGE_CHARS_LIMIT:
+            logger.info('消息过长，以文件的形式上传。')
+            file_meta_data_id = self.sync_upload_message_as_file(req_params.message, req_params)
+
+            if file_meta_data_id is None:
+                raise RuntimeError('Grok3 同步上传消息文件失败')
+
+            req_params.payload['fileAttachments'] = [file_meta_data_id]
+            req_params.payload['message'] = DEFAULT_UPLOAD_MESSAGE_PROMPT
+            req_params.message = DEFAULT_UPLOAD_MESSAGE_PROMPT
+            logger.info('同步上传消息文件成功。')
+
+        # 准备请求负载并发送请求
+        logger.info('发送流式响应请求')
+        with SyncNetClient(self.logger, self.client_kwargs) as client:
+            async for token in client.do_request(
+                    fetch=True,
+                    stream=True,
+                    method="POST",
+                    url=UPLOAD_FILE_URL,
+                    headers=req_params.headers,
+                    payload=req_params.payload
+            ):
+                yield token
