@@ -1,3 +1,4 @@
+import sqlite3
 import json
 import logging
 import os
@@ -152,19 +153,50 @@ class ThreadSafeCookieManagerClass:
     """
     线程安全的cookie轮换计数器，管理GrokCookie对象
     """
-    def __init__(self, cookies: List[str], filenames: List[str]):
+    def __init__(self, new_cookies: List[str], new_file_names: List[str]):
         self.lock = threading.Lock()
         self.cookies: dict[int, BaseCookie] = {}
+
+        os.makedirs('data')
+        self.conn = sqlite3.connect(
+            './data/Cookies.db'
+        )
+        cursor = self.conn.cursor()
+        cursor.execute(
+            """
+            create table if not exists cookies (
+                file_name text PRIMARY KEY,
+                cookie text,
+                classification text,
+                is_enable integer,
+                last_update_time text,
+                total_success_count integer,
+                total_fail_count integer,
+                success_count integer,
+                fail_count integer,
+                continues_error_time text,
+                last_success_time text,
+                last_fail_time text,
+                last_error text
+            )
+            """.strip()
+        )
+        self.conn.commit()
+        cursor.close()
         
         # 初始化GrokCookie对象
-        for i, cookie in enumerate(cookies):
-            filename = filenames[i] if filenames and i < len(filenames) else ""
-            cookie = GrokCookie(i, cookie, filename)
-            if filename.endswith('.ban'):
+        for i, cookie in enumerate(new_cookies):
+            file_name = new_file_names[i] if new_file_names and i < len(new_file_names) else ""
+            cookie = GrokCookie(i, cookie, file_name)
+            if file_name.endswith('.ban'):
                 cookie.set_is_enable(False)
             self.cookies[i] = cookie
             
         self.next_idx = max(self.cookies.keys()) + 1 if len(self.cookies) >= 1 else 0
+
+    def close(self):
+        if self.conn:
+            self.conn.close()
 
     @staticmethod
     def filter_alive(cookie_list: list[BaseCookie], classification: Optional[str]) -> list[BaseCookie]:

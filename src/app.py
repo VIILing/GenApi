@@ -36,6 +36,8 @@ async def lifespan(_: FastAPI):
 
     yield
 
+    CookieManager.close()
+
 
 # 创建FastAPI应用
 app = FastAPI(title="GenApi", version="1.0.0", lifespan=lifespan)
