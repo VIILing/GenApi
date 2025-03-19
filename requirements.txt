@@ -7,3 +7,4 @@ httpx
 python-dotenv
 sse-starlette
 pyyaml
+sqlalchemy

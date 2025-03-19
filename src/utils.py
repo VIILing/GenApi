@@ -9,6 +9,15 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta
 from typing import List, Dict, Any, Optional
 
+from sqlalchemy import (
+    create_engine, MetaData,
+
+    Column, String, Integer, BigInteger
+)
+from sqlalchemy.orm import sessionmaker, declarative_base
+from sqlalchemy.ext.hybrid import hybrid_property
+from sqlalchemy.types import TypeDecorator, JSON
+
 from typing_extensions import Self
 
 # 设置日志
@@ -21,131 +30,128 @@ class CookieMsg:
     cookie: str
 
 
-class BaseCookie(ABC):
-    def __init__(self, index: int, cookie: str, file_name: str):
-        self._index = index
-        self._classification: str = self.get_classification()
-        self._file_name: str = file_name
-        self._is_enable: bool = True
-        self._cookie: str = cookie
-        self._success_count: int = 0
-        self._fail_count: int = 0
-        self._last_success_time: Optional[datetime] = None
-        self._last_fail_time: Optional[datetime] = None
-        self._last_error: Optional[str] = None
-        self._is_occupied: bool = False
-        self._has_been_deleted: bool = False
-        self._continues_error_time: list[datetime] = []  # 记录连续失败的时间列表
-        self._last_update_time: datetime = datetime.now()  # 记录最后更新时间，默认为创建时间
+_Base = declarative_base()
+_MetaDataObj = MetaData()
 
-    def get_index(self) -> int:
-        return self._index
 
-    @abstractmethod
-    def get_classification(self) -> str:
-        """
-        """
+# 自定义类型
 
-    def get_cookie(self) -> str:
-        return self._cookie
 
-    def get_file_name(self) -> str:
-        return self._file_name
+class BooleanAsInteger(TypeDecorator):
+    impl = Integer
 
-    def set_file_name(self, new_name: str):
-        self._file_name = new_name
+    def process_bind_param(self, value: bool, dialect):
+        return 1 if value else 0
 
-    def get_is_enable(self) -> bool:
-        return self._is_enable
+    def process_result_value(self, value: int, dialect):
+        return bool(value)
 
-    def set_is_enable(self, new_status: bool):
-        self._is_enable = new_status
 
-    def get_is_occupied(self) -> bool:
-        return self._is_occupied
+class DateTimeType(TypeDecorator):
+    impl = BigInteger  # 底层使用 bigint 类型存储
 
-    def get_has_been_deleted(self) -> bool:
-        return self._has_been_deleted
+    def process_bind_param(self, value: datetime, dialect) -> int:
+        return int(value.timestamp())
 
-    def set_has_been_deleted(self, new_status: bool):
-        self._has_been_deleted = new_status
+    def process_result_value(self, value: int, dialect) -> datetime:
+        return datetime.fromtimestamp(value)
 
-    def get_last_update_time(self) -> datetime:
-        return self._last_update_time
 
-    def get_continues_error_count(self) -> int:
-        return len(self._continues_error_time)
+class DateTimeListType(TypeDecorator):
+    impl = JSON  # 底层使用 JSON 类型存储
 
-    def get_continues_error_time_by_index(self, idx: int):
-        if abs(idx) >= len(self._continues_error_time):
-            raise IndexError(f'Index {idx} out of range self._continues_error_time {self.get_continues_error_count()}')
-        return self._continues_error_time[idx]
+    def process_bind_param(self, value: List[datetime], dialect) -> list[int]:
+        return [int(dt.timestamp()) for dt in value] if value else []
 
-    def clear_continues_error_time(self):
-        self._continues_error_time.clear()
+    def process_result_value(self, value: List[int], dialect) -> list[datetime]:
+        return [datetime.fromtimestamp(s) for s in value] if value else []
+
+
+class CookieModel(_Base):
+    __tablename__ = 'cookies'
+
+    classification = Column(String, primary_key=True)
+    account = Column(String, primary_key=True)
+    cookie = Column(String, nullable=False)
+
+    is_enable = Column(BooleanAsInteger(), default=True)
+    last_update_time = Column(DateTimeType, default=datetime(2000, 1, 1))\
+
+    # is_occupied = Column(BooleanAsInteger(), default=False)
+
+    total_success_count = Column(Integer, default=0)
+    total_fail_count = Column(Integer, default=0)
+    success_count = Column(Integer, default=0)
+    fail_count = Column(Integer, default=0)
+
+    last_success_time = Column(DateTimeType, default=datetime(2000, 1, 1))
+    last_fail_time = Column(DateTimeType, default=datetime(2000, 1, 1))
+
+    last_error = Column(String, default='')
+
+    continues_error_time = Column(DateTimeListType)
 
     @staticmethod
-    def format_datetime(obj: datetime) -> str:
-        return obj.strftime('%Y-%m-%d %H:%M:%S')
-        
-    def mark_occupied(self):
-        """记录占用"""
-        self._is_occupied = True
-        
-    def mark_unoccupied(self, error_msg: Optional[str] = None):
-        """记录释放"""
-        self._is_occupied = False
-        if error_msg is None:
-            self._success_count += 1
-            self._last_success_time = datetime.now()
-            self._continues_error_time = []  # 请求成功时清空连续失败列表
-        else:
-            self._fail_count += 1
-            self._last_fail_time = datetime.now()
-            self._last_error = error_msg
-            self._continues_error_time.append(datetime.now())  # 请求失败时添加当前时间到失败列表
+    def format_datetime(o: datetime):
+        return o.strftime('%Y-%m-%d %H:%M:%S')
 
-    def update_cookie(self, new_cookie: str):
-        self._cookie = new_cookie
-        self._continues_error_time = []
-        self._last_update_time = datetime.now()
-
-    def update_file_name(self, new_file_name: str):
-        self._file_name = new_file_name
-
-    def update_last_update_time(self, new_update_time: datetime):
-        self._last_update_time = new_update_time
-    
-    def get_stats(self) -> Dict[str, Any]:
+    def get_stats(self) -> dict[str, Any]:
         """
         获取cookie的统计信息
-        
+
         Returns:
             包含cookie统计信息的字典
         """
         return {
-            "index": self._index,
-            "classification": self._classification,
-            "file_name": self._file_name,
-            "is_enable": '启用中' if self._is_enable else '手动禁止中',
-            "cookie": self._cookie,
-            "success_count": self._success_count,
-            "fail_count": self._fail_count,
-            "last_success_time": self.format_datetime(self._last_success_time) if self._last_success_time else None,
-            "last_fail_time": self.format_datetime(self._last_fail_time) if self._last_fail_time else None,
-            "last_error": self._last_error,
-            "is_occupied": self._is_occupied,
-            "continues_error_count": len(self._continues_error_time),
-            "last_update_times": self.format_datetime(self._last_update_time) if self._last_update_time else None
+            "classification": self.classification,
+            "account": self.account,
+            "cookie": self.cookie,
+
+            "is_enable": '启用中' if self.is_enable else '手动禁止中',
+            "last_update_times": self.format_datetime(self.last_update_time) if self.last_update_time else None,
+
+            # "is_occupied": self.is_occupied,
+
+            "total_success_count": self.total_success_count,
+            "total_fail_count": self.total_fail_count,
+            "success_count": self.success_count,
+            "fail_count": self.fail_count,
+
+            "last_success_time": self.format_datetime(self.last_success_time) if self.last_success_time else None,
+            "last_fail_time": self.format_datetime(self.last_fail_time) if self.last_fail_time else None,
+
+            "last_error": self.last_error,
+
+            "continues_error_count": len(self.continues_error_time),
         }
-        
-        
-class GrokCookie(BaseCookie):
-    """
-    Grok Cookie对象，包含cookie及其使用统计信息
-    """
-    def get_classification(self) -> str:
-        return "grok"
+
+    # def mark_occupied(self):
+    #     """记录占用"""
+    #     self._is_occupied = True
+    #
+    # def mark_unoccupied(self, error_msg: Optional[str] = None):
+    #     """记录释放"""
+    #     self._is_occupied = False
+    #     if error_msg is None:
+    #         self._success_count += 1
+    #         self._last_success_time = datetime.now()
+    #         self._continues_error_time = []  # 请求成功时清空连续失败列表
+    #     else:
+    #         self._fail_count += 1
+    #         self._last_fail_time = datetime.now()
+    #         self._last_error = error_msg
+    #         self._continues_error_time.append(datetime.now())  # 请求失败时添加当前时间到失败列表
+    #
+    # def update_cookie(self, new_cookie: str):
+    #     self._cookie = new_cookie
+    #     self._continues_error_time = []
+    #     self._last_update_time = datetime.now()
+    #
+    # def update_file_name(self, new_file_name: str):
+    #     self._file_name = new_file_name
+    #
+    # def update_last_update_time(self, new_update_time: datetime):
+    #     self._last_update_time = new_update_time
 
 
 # 线程安全的cookie轮换计数器
@@ -153,41 +159,27 @@ class ThreadSafeCookieManagerClass:
     """
     线程安全的cookie轮换计数器，管理GrokCookie对象
     """
-    def __init__(self, new_cookies: List[str], new_file_names: List[str]):
-        self.lock = threading.Lock()
-        self.cookies: dict[int, BaseCookie] = {}
+    def __init__(self, batch_initialize: list[tuple[str, str, str]]):
+        self._lock = threading.Lock()
+        self._all_idx: dict[int, tuple[str, str]] = dict()
+        self._occupied: set[int] = set()
 
         os.makedirs('data')
-        self.conn = sqlite3.connect(
-            './data/Cookies.db'
-        )
-        cursor = self.conn.cursor()
-        cursor.execute(
-            """
-            create table if not exists cookies (
-                file_name text PRIMARY KEY,
-                cookie text,
-                classification text,
-                is_enable integer,
-                last_update_time text,
-                total_success_count integer,
-                total_fail_count integer,
-                success_count integer,
-                fail_count integer,
-                continues_error_time text,
-                last_success_time text,
-                last_fail_time text,
-                last_error text
-            )
-            """.strip()
-        )
-        self.conn.commit()
-        cursor.close()
-        
+        self.engine = create_engine("sqlite:///data/Cookies.db")
+        _MetaDataObj.create_all(self.engine)
+        self.session_maker = sessionmaker(self.engine)
+
+        pks = set()
+        idx = 1
+        with self.session_maker() as session:
+            objs = session.query(CookieModel).all()
+            for o in objs:
+                self._all_idx[idx] = (o.classification, o.account)
+
         # 初始化GrokCookie对象
         for i, cookie in enumerate(new_cookies):
             file_name = new_file_names[i] if new_file_names and i < len(new_file_names) else ""
-            cookie = GrokCookie(i, cookie, file_name)
+            cookie = GrokCookie(i, file_name, cookie)
             if file_name.endswith('.ban'):
                 cookie.set_is_enable(False)
             self.cookies[i] = cookie
@@ -195,8 +187,7 @@ class ThreadSafeCookieManagerClass:
         self.next_idx = max(self.cookies.keys()) + 1 if len(self.cookies) >= 1 else 0
 
     def close(self):
-        if self.conn:
-            self.conn.close()
+        pass
 
     @staticmethod
     def filter_alive(cookie_list: list[BaseCookie], classification: Optional[str]) -> list[BaseCookie]:
