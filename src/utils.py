@@ -22,45 +22,98 @@ class CookieMsg:
 
 class BaseCookie(ABC):
     def __init__(self, index: int, cookie: str, file_name: str):
-        self.index = index
-        self.classification = self.get_classification()
-        self.file_name = file_name
-        self.is_enable = True
-        self.cookie = cookie
-        self.success_count = 0
-        self.fail_count = 0
-        self.last_success_time = None
-        self.last_fail_time = None
-        self.last_error = None
-        self.is_occupied = False
-        self.has_been_deleted = False
-        self.continues_error_time = []  # 记录连续失败的时间列表
-        self.last_update_times = datetime.now()  # 记录最后更新时间，默认为创建时间
+        self._index = index
+        self._classification: str = self.get_classification()
+        self._file_name: str = file_name
+        self._is_enable: bool = True
+        self._cookie: str = cookie
+        self._success_count: int = 0
+        self._fail_count: int = 0
+        self._last_success_time: Optional[datetime] = None
+        self._last_fail_time: Optional[datetime] = None
+        self._last_error: Optional[str] = None
+        self._is_occupied: bool = False
+        self._has_been_deleted: bool = False
+        self._continues_error_time: list[datetime] = []  # 记录连续失败的时间列表
+        self._last_update_time: datetime = datetime.now()  # 记录最后更新时间，默认为创建时间
+
+    def get_index(self) -> int:
+        return self._index
+
+    @abstractmethod
+    def get_classification(self) -> str:
+        """
+        """
+
+    def get_cookie(self) -> str:
+        return self._cookie
+
+    def get_file_name(self) -> str:
+        return self._file_name
+
+    def set_file_name(self, new_name: str):
+        self._file_name = new_name
+
+    def get_is_enable(self) -> bool:
+        return self._is_enable
+
+    def set_is_enable(self, new_status: bool):
+        self._is_enable = new_status
+
+    def get_is_occupied(self) -> bool:
+        return self._is_occupied
+
+    def get_has_been_deleted(self) -> bool:
+        return self._has_been_deleted
+
+    def set_has_been_deleted(self, new_status: bool):
+        self._has_been_deleted = new_status
+
+    def get_last_update_time(self) -> datetime:
+        return self._last_update_time
+
+    def get_continues_error_count(self) -> int:
+        return len(self._continues_error_time)
+
+    def get_continues_error_time_by_index(self, idx: int):
+        if abs(idx) >= len(self._continues_error_time):
+            raise IndexError(f'Index {idx} out of range self._continues_error_time {self.get_continues_error_count()}')
+        return self._continues_error_time[idx]
+
+    def clear_continues_error_time(self):
+        self._continues_error_time.clear()
 
     @staticmethod
     def format_datetime(obj: datetime) -> str:
         return obj.strftime('%Y-%m-%d %H:%M:%S')
         
-    @abstractmethod
-    def get_classification(self) -> str:
-        pass
-        
     def mark_occupied(self):
         """记录占用"""
-        self.is_occupied = True
+        self._is_occupied = True
         
     def mark_unoccupied(self, error_msg: Optional[str] = None):
         """记录释放"""
-        self.is_occupied = False
+        self._is_occupied = False
         if error_msg is None:
-            self.success_count += 1
-            self.last_success_time = datetime.now()
-            self.continues_error_time = []  # 请求成功时清空连续失败列表
+            self._success_count += 1
+            self._last_success_time = datetime.now()
+            self._continues_error_time = []  # 请求成功时清空连续失败列表
         else:
-            self.fail_count += 1
-            self.last_fail_time = datetime.now()
-            self.last_error = error_msg
-            self.continues_error_time.append(datetime.now())  # 请求失败时添加当前时间到失败列表
+            self._fail_count += 1
+            self._last_fail_time = datetime.now()
+            self._last_error = error_msg
+            self._continues_error_time.append(datetime.now())  # 请求失败时添加当前时间到失败列表
+
+    def update_cookie(self, new_cookie: str):
+        self._cookie = new_cookie
+        self._continues_error_time = []
+        self._last_update_time = datetime.now()
+
+    def update_file_name(self, new_file_name: str):
+        self._file_name = new_file_name
+
+    def update_last_update_time(self, new_update_time: datetime):
+        self._last_update_time = new_update_time
     
     def get_stats(self) -> Dict[str, Any]:
         """
@@ -70,19 +123,19 @@ class BaseCookie(ABC):
             包含cookie统计信息的字典
         """
         return {
-            "index": self.index,
-            "classification": self.classification,
-            "file_name": self.file_name,
-            "is_enable": '启用中' if self.is_enable else '手动禁止中',
-            "cookie": self.cookie,
-            "success_count": self.success_count,
-            "fail_count": self.fail_count,
-            "last_success_time": self.format_datetime(self.last_success_time) if self.last_success_time else None,
-            "last_fail_time": self.format_datetime(self.last_fail_time) if self.last_fail_time else None,
-            "last_error": self.last_error,
-            "is_occupied": self.is_occupied,
-            "continues_error_count": len(self.continues_error_time),
-            "last_update_times": self.format_datetime(self.last_update_times) if self.last_update_times else None
+            "index": self._index,
+            "classification": self._classification,
+            "file_name": self._file_name,
+            "is_enable": '启用中' if self._is_enable else '手动禁止中',
+            "cookie": self._cookie,
+            "success_count": self._success_count,
+            "fail_count": self._fail_count,
+            "last_success_time": self.format_datetime(self._last_success_time) if self._last_success_time else None,
+            "last_fail_time": self.format_datetime(self._last_fail_time) if self._last_fail_time else None,
+            "last_error": self._last_error,
+            "is_occupied": self._is_occupied,
+            "continues_error_count": len(self._continues_error_time),
+            "last_update_times": self.format_datetime(self._last_update_time) if self._last_update_time else None
         }
         
         
@@ -108,7 +161,7 @@ class ThreadSafeCookieManagerClass:
             filename = filenames[i] if filenames and i < len(filenames) else ""
             cookie = GrokCookie(i, cookie, filename)
             if filename.endswith('.ban'):
-                cookie.is_enable = False
+                cookie.set_is_enable(False)
             self.cookies[i] = cookie
             
         self.next_idx = max(self.cookies.keys()) + 1 if len(self.cookies) >= 1 else 0
@@ -120,25 +173,25 @@ class ThreadSafeCookieManagerClass:
 
         for cookie in cookie_list:
             # 基础筛选条件
-            if not cookie.is_enable or cookie.is_occupied or cookie.has_been_deleted:
+            if not cookie.get_is_enable() or cookie.get_is_occupied() or cookie.get_has_been_deleted():
                 continue
 
             # 分类筛选
-            if classification and cookie.classification != classification:
+            if classification and cookie.get_classification() != classification:
                 continue
 
             # 连续失败策略处理
-            if len(cookie.continues_error_time) >= 3:
+            if cookie.get_continues_error_count() >= 3:
                 # 如果最后更新时间晚于最后失败时间，清空失败记录并允许使用
-                if cookie.last_update_times > cookie.continues_error_time[-1]:
-                    logger.info(f"Cookie {cookie.index} 连续失败但已更新，清空失败记录")
-                    cookie.continues_error_time = []
+                if cookie.get_last_update_time() > cookie.get_continues_error_time_by_index(-1):
+                    logger.info(f"Cookie {cookie.get_index()} 连续失败但已更新，清空失败记录")
+                    cookie.clear_continues_error_time()
                 # 如果最后失败时间超过24小时，允许尝试一次
-                elif datetime.now() - cookie.continues_error_time[-1] > timedelta(hours=24):
-                    logger.info(f"Cookie {cookie.index} 连续失败但超过24小时，允许尝试")
+                elif datetime.now() - cookie.get_continues_error_time_by_index(-1) > timedelta(hours=24):
+                    logger.info(f"Cookie {cookie.get_index()} 连续失败但超过24小时，允许尝试")
                 # 否则不允许使用
                 else:
-                    logger.info(f"Cookie {cookie.index} 连续失败且未更新，跳过使用")
+                    logger.info(f"Cookie {cookie.get_index()} 连续失败且未更新，跳过使用")
                     continue
 
             alive.append(cookie)
@@ -164,7 +217,7 @@ class ThreadSafeCookieManagerClass:
             min_use = min(available_cookies, key=lambda x: (x.success_count + x.fail_count))
             min_use.mark_occupied()
             
-            return CookieMsg(min_use.index, min_use.cookie)
+            return CookieMsg(min_use.get_index(), min_use.get_cookie())
    
     def release_cookie(self, cookie_msg: CookieMsg, error_msg: str = None):
         """
@@ -185,12 +238,12 @@ class ThreadSafeCookieManagerClass:
         with self.lock:
             ret = []
             alive = self.filter_alive(list(self.cookies.values()), None)
-            alive_index = {c.index for c in alive}
+            alive_index = {c.get_index() for c in alive}
             for cookie in self.cookies.values():
-                if cookie.has_been_deleted:
+                if cookie.get_has_been_deleted():
                     continue
                 s = cookie.get_stats()
-                s['is_alive'] = '存活中' if cookie.index in alive_index else '已死亡'
+                s['is_alive'] = '存活中' if cookie.get_index() in alive_index else '已死亡'
                 ret.append(s)
             return ret
         
@@ -219,13 +272,13 @@ class ThreadSafeCookieManagerClass:
         
         return cls(cookies, filenames)
     
-    def update_cookie(self, cookie_index: int, cookie: str) -> tuple[bool, str]:
+    def update_cookie(self, cookie_index: int, new_cookie: str) -> tuple[bool, str]:
         """
         更新指定索引的cookie
         
         Args:
             cookie_index: cookie索引
-            cookie: 新的cookie字符串
+            new_cookie: 新的cookie字符串
             
         Returns:
             (是否成功, 成功或失败信息)的元组
@@ -234,15 +287,14 @@ class ThreadSafeCookieManagerClass:
             if cookie_index is None or cookie_index not in self.cookies:
                 return False, "cookie索引不存在"
             else:
-                self.cookies[cookie_index].cookie = cookie
-                self.cookies[cookie_index].continues_error_time = []  # 更新cookie时清空连续失败列表
-                self.cookies[cookie_index].last_update_times = datetime.now()  # 更新最后更新时间
-                logger.info(f"已在内存中更新cookie: {self.cookies[cookie_index].file_name}")
+
+                self.cookies[cookie_index].update_cookie(new_cookie)
+                logger.info(f"已在内存中更新cookie: {self.cookies[cookie_index].get_file_name()}")
                 
                 try:
-                    logger.info(f"尝试写入更新后的cookie: {self.cookies[cookie_index].file_name}")
-                    with open(f"cookies/{self.cookies[cookie_index].file_name}", "w", encoding="utf-8") as f:
-                        f.write(cookie)
+                    logger.info(f"尝试写入更新后的cookie: {self.cookies[cookie_index].get_file_name()}")
+                    with open(f"cookies/{self.cookies[cookie_index].get_file_name()}", "w", encoding="utf-8") as f:
+                        f.write(new_cookie)
                 except Exception as e:
                     logger.error(f"更新cookie文件时出错: {str(e)}")
                     return False, f"更新cookie文件时出错: {str(e)}"
@@ -266,13 +318,13 @@ class ThreadSafeCookieManagerClass:
                 return False, "cookie索引不存在"
             else:
                 cookie = self.cookies[cookie_index]
-                cookie.is_enable = new_status
+                cookie.set_is_enable(new_status)
                 try:
-                    old_name = cookie.file_name
-                    new_suffix = '' if cookie.is_enable else '.ban'
+                    old_name = cookie.get_file_name()
+                    new_suffix = '' if cookie.get_is_enable() else '.ban'
                     new_name = old_name.rstrip('.ban') + new_suffix
                     need_rename = (old_name != new_name)
-                    cookie.file_name = new_name
+                    cookie.set_file_name(new_name)
 
                     if need_rename and os.path.exists(f'cookies/{old_name}'):
                         os.rename(f'cookies/{old_name}', f'cookies/{new_name}')
@@ -289,7 +341,7 @@ class ThreadSafeCookieManagerClass:
             file_name: 新的cookie文件名
         """
         
-        if file_name in {v.file_name for v in self.cookies.values()}:
+        if file_name in {v.get_file_name() for v in self.cookies.values()}:
             return False, "文件名已存在"
         
         with self.lock:
@@ -301,7 +353,7 @@ class ThreadSafeCookieManagerClass:
                 return False, f"添加cookie文件时出错: {str(e)}"
             
             self.cookies[self.next_idx] = GrokCookie(self.next_idx, cookie, file_name)
-            self.cookies[self.next_idx].last_update_times = datetime.now()  # 设置最后更新时间为添加时间
+            self.cookies[self.next_idx].update_last_update_time(datetime.now())  # 设置最后更新时间为添加时间
             self.next_idx += 1
             
             return True, "Cookie添加成功"
@@ -317,11 +369,11 @@ class ThreadSafeCookieManagerClass:
             if cookie_index is None or cookie_index not in self.cookies:
                 return False, "cookie索引不存在"
             else:
-                self.cookies[cookie_index].has_been_deleted = True
+                self.cookies[cookie_index].set_has_been_deleted(True)
                 
                 try:
-                    if os.path.exists(f"cookies/{self.cookies[cookie_index].file_name}"):
-                        os.remove(f"cookies/{self.cookies[cookie_index].file_name}")
+                    if os.path.exists(f"cookies/{self.cookies[cookie_index].get_file_name()}"):
+                        os.remove(f"cookies/{self.cookies[cookie_index].get_file_name()}")
                 except Exception as e:
                     logger.error(f"删除cookie文件时出错: {str(e)}")
                     return True, f"删除cookie文件时出错: {str(e)}"
@@ -349,4 +401,4 @@ def generate_uuid() -> str:
     Returns:
         UUID字符串
     """
-    return str(uuid.uuid4()) 
+    return str(uuid.uuid4())
